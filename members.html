@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guild Members</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #fff;
+      --text: #0f172a;
+      --muted: rgba(15, 23, 42, .60);
+      --stroke: rgba(15, 23, 42, .10);
+      --shadow: 0 16px 44px rgba(15, 23, 42, .08);
+      --radius: 18px;
+
+      --blue: #2f7de1;
+      --badge-bg: #edf4ff;
+      --badge-text: #2f7de1;
+      --soft: #f7f9ff;
+
+      --gold: rgba(245, 158, 11, .95);
+      --gold-bg: rgba(245, 158, 11, .14);
+      --gold-stroke: rgba(245, 158, 11, .28);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      font-weight: 400;
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 22px 14px 34px;
+    }
+
+    .cardx {
+      border: 1px solid var(--stroke);
+      border-radius: calc(var(--radius) + 6px);
+      background: rgba(255, 255, 255, .95);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .topbar {
+      padding: 16px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      border: 1px solid rgba(47, 125, 225, .20);
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--blue);
+      box-shadow: 0 0 0 4px rgba(47, 125, 225, .18);
+    }
+
+    .title {
+      margin-top: 10px;
+      font-size: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .btn-ghost {
+      height: 42px;
+      border-radius: 14px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, .9);
+      padding: 0 12px;
+      font-weight: 400;
+    }
+
+    .btn-export {
+      height: 42px;
+      border-radius: 14px;
+      border: 1px solid rgba(47, 125, 225, .24);
+      background: rgba(237, 244, 255, .85);
+      color: rgba(47, 125, 225, .95);
+      padding: 0 12px;
+      font-weight: 400;
+    }
+
+    .btn-export:hover {
+      background: rgba(237, 244, 255, .95);
+    }
+
+    .controls {
+      padding: 14px 16px 16px;
+      border-top: 1px solid rgba(15, 23, 42, .08);
+    }
+
+    .seg {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .seg button {
+      height: 36px;
+      border-radius: 999px;
+      padding: 0 14px;
+      border: 1px solid rgba(15, 23, 42, .12);
+      background: rgba(255, 255, 255, .9);
+      color: rgba(15, 23, 42, .72);
+      font-weight: 400;
+    }
+
+    .seg button.active {
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      border-color: rgba(47, 125, 225, .28);
+    }
+
+    .control {
+      border: 1px solid rgba(15, 23, 42, .12);
+      border-radius: 14px;
+      height: 42px;
+      padding: 10px 12px;
+      background: rgba(249, 251, 255, .95);
+      font-weight: 400;
+    }
+
+    .control:focus {
+      outline: none;
+      border-color: rgba(77, 163, 255, .70);
+      box-shadow: 0 0 0 .25rem rgba(77, 163, 255, .18);
+      background: #fff;
+    }
+
+    /* 통계 */
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(15, 23, 42, .08);
+      background: linear-gradient(180deg, #f7f9ff, #ffffff);
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: rgba(255, 255, 255, .85);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .stat .value {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    /* 길드 정보 */
+    .guildinfo {
+      display: none;
+      padding: 10px 16px 16px;
+      border-top: 1px solid rgba(15, 23, 42, .08);
+      background: rgba(255, 255, 255, .92);
+    }
+
+    .guildinfo-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .gi {
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: rgba(249, 251, 255, .90);
+      font-size: 13px;
+      color: rgba(15, 23, 42, .65);
+    }
+
+    .gi .v {
+      font-weight: 600;
+      color: rgba(15, 23, 42, .90);
+    }
+
+    /* 테이블 */
+    .table-wrap {
+      width: 100%;
+      overflow: auto;
+    }
+
+    table {
+      margin: 0;
+      min-width: 980px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--soft);
+      border-bottom: 1px solid rgba(15, 23, 42, .10) !important;
+      font-size: 13px;
+      color: rgba(15, 23, 42, .75);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 400;
+    }
+
+    tbody td {
+      border-color: rgba(15, 23, 42, .08) !important;
+      white-space: nowrap;
+      font-weight: 400;
+      vertical-align: middle;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .sort-ind {
+      margin-left: 6px;
+      font-size: 11px;
+      color: rgba(15, 23, 42, .45);
+    }
+
+    .num-col {
+      width: 70px;
+    }
+
+    .role-col {
+      width: 110px;
+      max-width: 110px;
+    }
+
+    .power-col {
+      width: 110px;
+      max-width: 110px;
+    }
+
+    .note-col {
+      min-width: 360px;
+    }
+
+    .role-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: rgba(15, 23, 42, .04);
+      color: rgba(15, 23, 42, .75);
+      font-size: 12px;
+      line-height: 1;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .role-pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 99px;
+      margin-right: 8px;
+      background: rgba(15, 23, 42, .35);
+      flex: 0 0 auto;
+    }
+
+    .role-leader {
+      background: rgba(245, 158, 11, .10);
+      border-color: rgba(245, 158, 11, .24);
+      color: rgba(146, 64, 14, .95);
+    }
+
+    .role-leader::before {
+      background: rgba(245, 158, 11, .95);
+    }
+
+    .role-officer {
+      background: rgba(99, 102, 241, .10);
+      border-color: rgba(99, 102, 241, .24);
+      color: rgba(55, 48, 163, .95);
+    }
+
+    .role-officer::before {
+      background: rgba(99, 102, 241, .95);
+    }
+
+    .role-member {
+      background: rgba(34, 197, 94, .10);
+      border-color: rgba(34, 197, 94, .22);
+      color: rgba(22, 101, 52, .95);
+    }
+
+    .role-member::before {
+      background: rgba(34, 197, 94, .95);
+    }
+
+    .role-guest {
+      background: rgba(148, 163, 184, .18);
+      border-color: rgba(148, 163, 184, .35);
+      color: rgba(51, 65, 85, .95);
+    }
+
+    .role-guest::before {
+      background: rgba(100, 116, 139, .90);
+    }
+
+    tr.top5 {
+      background: linear-gradient(90deg, rgba(245, 158, 11, .10), rgba(255, 255, 255, 0));
+    }
+
+    tr.top5 td {
+      border-color: rgba(245, 158, 11, .18) !important;
+    }
+
+    .top5-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--gold-stroke);
+      background: var(--gold-bg);
+      color: rgba(120, 53, 15, .95);
+      font-size: 12px;
+      line-height: 1;
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+
+    .top5-badge .c {
+      width: 7px;
+      height: 7px;
+      border-radius: 99px;
+      background: var(--gold);
+      box-shadow: 0 0 0 4px rgba(245, 158, 11, .18);
+    }
+
+    .error {
+      display: none;
+      margin: 10px 16px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(220, 38, 38, .22);
+      background: rgba(220, 38, 38, .06);
+      color: rgba(220, 38, 38, .92);
+      font-size: 13px;
+    }
+
+    .loading {
+      display: none;
+      margin: 10px 16px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: rgba(15, 23, 42, .03);
+      color: rgba(15, 23, 42, .70);
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <script>
+      (function () {
+        const AUTH_KEY = "guild_auth_v1";
+        const FIXED_ID = "admin";
+        try {
+          const raw = localStorage.getItem(AUTH_KEY);
+          const a = raw ? JSON.parse(raw) : null;
+          if (!a || a.id !== FIXED_ID || !a.exp || Date.now() > a.exp) {
+            localStorage.removeItem(AUTH_KEY);
+            location.replace("index.html");
+          }
+        } catch (e) {
+          localStorage.removeItem(AUTH_KEY);
+          location.replace("index.html");
+        }
+      })();
+    </script>
+
+    <div class="cardx mb-3">
+      <div class="topbar">
+        <div class="d-flex justify-content-between gap-2">
+          <div>
+            <div class="pill"><span class="dot"></span> 메이플키우기 16서버 · 공인 길드</div>
+            <div class="title">길드원 관리</div>
+          </div>
+
+          <div class="d-flex gap-2 align-items-start">
+            <button id="exportBtn" class="btn-export">내보내기</button>
+            <button id="logoutBtn" class="btn-ghost">로그아웃</button>
+          </div>
+        </div>
+
+        <div id="loadingBox" class="loading">불러오는 중…</div>
+        <div id="errorBox" class="error"></div>
+      </div>
+
+      <div class="controls">
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div id="seg" class="seg">
+              <button type="button" class="active" data-tier="ALL">ALL</button>
+              <button type="button" data-tier="1">공인1</button>
+              <button type="button" data-tier="2">공인2</button>
+              <button type="button" data-tier="3">공인3</button>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <input id="q" class="control w-100" placeholder="닉네임 / 직위 / 비고 검색" />
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat">표시 <span class="value" id="statCount">0명</span></div>
+        <div class="stat">합계 <span class="value" id="statSum">0억</span></div>
+        <div class="stat">평균 <span class="value" id="statAvg">0억</span></div>
+        <div class="stat">최대 <span class="value" id="statMax">0억</span></div>
+        <div class="stat">최소 <span class="value" id="statMin">0억</span></div>
+      </div>
+
+      <div id="guildInfo" class="guildinfo">
+        <div class="guildinfo-row">
+          <div class="gi">길드 본부 <span class="v" id="giHQ">Lv.1</span></div>
+          <div class="gi">길드 창고 <span class="v" id="giWH">Lv.1</span></div>
+          <div class="gi">길드 연구소 <span class="v" id="giLAB">Lv.1</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cardx">
+      <div class="table-wrap">
+        <table class="table table-hover align-middle">
+          <thead id="thead">
+            <tr>
+              <th class="num-col" data-key="rowno">No <span class="sort-ind" data-si="rowno"></span></th>
+              <th data-key="nick">닉네임 <span class="sort-ind" data-si="nick"></span></th>
+              <th class="role-col" data-key="role">직위 <span class="sort-ind" data-si="role"></span></th>
+              <th class="power-col right" data-key="power">전투력(억) <span class="sort-ind" data-si="power"></span></th>
+              <th class="note-col" data-key="note">비고 <span class="sort-ind" data-si="note"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const AUTH_KEY = "guild_auth_v1";
+    const CSV_FILES = {
+      1: "공인1_길드원_리스트.csv",
+      2: "공인2_길드원_리스트.csv",
+      3: "공인3_길드원_리스트.csv",
+    };
+
+    const GUILD_INFO = {
+      1: { hq: "Lv.0", wh: "Lv.0", lab: "Lv.0" },
+      2: { hq: "Lv.0", wh: "Lv.0", lab: "Lv.0" },
+      3: { hq: "Lv.4", wh: "Lv.4", lab: "Lv.4" },
+    };
+
+    const elLogout = document.getElementById("logoutBtn");
+    const elExport = document.getElementById("exportBtn");
+    const elSeg = document.getElementById("seg");
+    const elQ = document.getElementById("q");
+    const elThead = document.getElementById("thead");
+    const elTbody = document.getElementById("tbody");
+    const elError = document.getElementById("errorBox");
+    const elLoading = document.getElementById("loadingBox");
+
+    const elStatCount = document.getElementById("statCount");
+    const elStatSum = document.getElementById("statSum");
+    const elStatAvg = document.getElementById("statAvg");
+    const elStatMax = document.getElementById("statMax");
+    const elStatMin = document.getElementById("statMin");
+
+    const elGuildInfo = document.getElementById("guildInfo");
+    const elGiHQ = document.getElementById("giHQ");
+    const elGiWH = document.getElementById("giWH");
+    const elGiLAB = document.getElementById("giLAB");
+
+    let currentTier = "ALL";
+    let currentQuery = "";
+    let sortKey = "power";
+    let sortDir = "desc";
+
+    const cache = new Map();
+    let allRows = [];
+    let viewRows = [];
+
+    function updateGuildInfo() {
+      if (currentTier === "ALL") {
+        elGuildInfo.style.display = "none";
+        return;
+      }
+      const info = GUILD_INFO[Number(currentTier)];
+      if (!info) {
+        elGuildInfo.style.display = "none";
+        return;
+      }
+      elGiHQ.textContent = info.hq;
+      elGiWH.textContent = info.wh;
+      elGiLAB.textContent = info.lab;
+      elGuildInfo.style.display = "block";
+    }
+
+    function setLoading(on) { elLoading.style.display = on ? "block" : "none"; }
+    function showError(msg) {
+      if (!msg) { elError.style.display = "none"; elError.textContent = ""; return; }
+      elError.style.display = "block"; elError.textContent = msg;
+    }
+
+    elLogout.addEventListener("click", () => {
+      localStorage.removeItem(AUTH_KEY);
+      location.replace("index.html");
+    });
+
+    function parseCSV(text) {
+      const rows = [];
+      let i = 0, field = "", row = [], inQuotes = false;
+
+      function pushField() { row.push(field); field = ""; }
+      function pushRow() {
+        const joined = row.join("").trim();
+        if (joined.length === 0) { row = []; return; }
+        rows.push(row);
+        row = [];
+      }
+
+      while (i < text.length) {
+        const c = text[i];
+        if (inQuotes) {
+          if (c === '"') {
+            const next = text[i + 1];
+            if (next === '"') { field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += c; i++; continue;
+        } else {
+          if (c === '"') { inQuotes = true; i++; continue; }
+          if (c === ",") { pushField(); i++; continue; }
+          if (c === "\r") { i++; continue; }
+          if (c === "\n") { pushField(); pushRow(); i++; continue; }
+          field += c; i++; continue;
+        }
+      }
+      pushField(); pushRow();
+      return rows;
+    }
+
+    function normHeader(h) { return String(h ?? "").trim().replaceAll(" ", "").replaceAll("\t", ""); }
+    function toNumberSafe(v) {
+      const s = String(v ?? "").trim().replaceAll("억", "").replaceAll(",", "");
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function mapCSVToRows(tier, csvText) {
+      const grid = parseCSV(csvText);
+      if (grid.length < 2) return [];
+
+      const header = grid[0].map(normHeader);
+
+      const nickI = header.findIndex(h => h === "닉네임" || h === "nickname");
+      const roleI = header.findIndex(h => h === "직위" || h === "직책" || h === "role");
+      const powI = header.findIndex(h => h === "전투력(억)" || h === "전투력" || h === "power");
+      const noteI = header.findIndex(h => h === "비고" || h === "note");
+
+      if (nickI < 0 || roleI < 0 || powI < 0 || noteI < 0) {
+        throw new Error("CSV 헤더가 올바르지 않습니다. (닉네임, 직위, 전투력(억), 비고)");
+      }
+
+      const out = [];
+      for (let r = 1; r < grid.length; r++) {
+        const line = grid[r];
+        const row = {
+          tier: Number(tier),
+          nick: String(line[nickI] ?? "").trim(),
+          role: String(line[roleI] ?? "").trim(),
+          power: toNumberSafe(line[powI]),
+          note: String(line[noteI] ?? "").trim(),
+        };
+        if (!row.nick) continue;
+        out.push(row);
+      }
+      return out;
+    }
+
+    async function loadTier(tier) {
+      const t = Number(tier);
+      if (cache.has(t)) return cache.get(t);
+
+      const file = CSV_FILES[t];
+      if (!file) return [];
+
+      const res = await fetch(encodeURI(file), { cache: "no-store" });
+      if (!res.ok) throw new Error(`CSV를 불러오지 못했습니다: ${file} (HTTP ${res.status})`);
+
+      const text = await res.text();
+      const rows = mapCSVToRows(t, text);
+      cache.set(t, rows);
+      return rows;
+    }
+
+    async function loadByCurrentTier() {
+      showError(null);
+      setLoading(true);
+      try {
+        if (currentTier === "ALL") {
+          const [a, b, c] = await Promise.all([loadTier(1), loadTier(2), loadTier(3)]);
+          allRows = [...a, ...b, ...c];
+        } else {
+          allRows = await loadTier(currentTier);
+        }
+        render();
+      } catch (err) {
+        allRows = [];
+        render();
+        showError(String(err?.message || err));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function formatEok(n) {
+      const v = Number(n || 0);
+      const isInt = Number.isInteger(v);
+      return (isInt ? v.toString() : v.toFixed(1)) + "억";
+    }
+
+    function round1(n) {
+      const v = Math.round((Number(n) || 0) * 10) / 10;
+      return Number.isInteger(v) ? v.toString() : v.toFixed(1);
+    }
+
+    function applyQuery(rows) {
+      const q = currentQuery.trim().toLowerCase();
+      if (!q) return rows;
+      return rows.filter(x => (`${x.nick} ${x.role} ${x.note}`).toLowerCase().includes(q));
+    }
+
+    function roleSortRank(role) {
+      const r = String(role || "").trim();
+      if (r === "마스터") return 0;
+      if (r === "다운증후군") return 1;
+      return 2;
+    }
+
+    function compare(a, b) {
+      const dir = (sortDir === "asc") ? 1 : -1;
+
+      if (sortKey === "role") {
+        const ar = roleSortRank(a.role);
+        const br = roleSortRank(b.role);
+
+        if (ar !== br) return (ar - br) * dir;
+
+        const av = String(a.role ?? "");
+        const bv = String(b.role ?? "");
+        const cmp = av.localeCompare(bv, "ko");
+        if (cmp !== 0) return cmp * dir;
+
+        return String(a.nick ?? "").localeCompare(String(b.nick ?? ""), "ko") * dir;
+      }
+
+      if (sortKey === "power") return ((a.power || 0) - (b.power || 0)) * dir;
+      const av = String(a[sortKey] ?? "");
+      const bv = String(b[sortKey] ?? "");
+      return av.localeCompare(bv, "ko") * dir;
+    }
+
+    function updateSortIndicators() {
+      elThead.querySelectorAll("[data-si]").forEach(s => s.textContent = "");
+      const target = elThead.querySelector(`[data-si="${sortKey}"]`);
+      if (target) target.textContent = (sortDir === "asc") ? "▲" : "▼";
+    }
+
+    function roleClass(role) {
+      const r = String(role || "").trim().toLowerCase();
+      if (!r) return "";
+
+      if (r.includes("길드장") || r.includes("마스터") || r.includes("master") || r.includes("leader")) return "role-leader";
+
+      if (r.includes("부") || r.includes("운영") || r.includes("간부") || r.includes("임원") || r.includes("officer") || r.includes("admin")) return "role-officer";
+
+      if (r.includes("게스트") || r.includes("대기") || r.includes("신규") || r.includes("guest") || r.includes("new")) return "role-guest";
+
+      return "role-member";
+    }
+
+    function getTop5NickSet(rows) {
+      const top = rows
+        .slice()
+        .sort((a, b) => (Number(b.power || 0) - Number(a.power || 0)))
+        .slice(0, 5)
+        .map(x => x.nick);
+      return new Set(top);
+    }
+
+    function render() {
+      const filtered = applyQuery(allRows).slice().sort(compare);
+      viewRows = filtered;
+
+      const count = filtered.length;
+      const powers = filtered.map(x => Number(x.power || 0));
+      const sum = powers.reduce((acc, v) => acc + v, 0);
+      const avg = count ? (sum / count) : 0;
+      const max = count ? Math.max(...powers) : 0;
+      const min = count ? Math.min(...powers) : 0;
+
+      elStatCount.textContent = `${count}명`;
+      elStatSum.textContent = `${round1(sum)}억`;
+      elStatAvg.textContent = `${round1(avg)}억`;
+      elStatMax.textContent = `${round1(max)}억`;
+      elStatMin.textContent = `${round1(min)}억`;
+
+      const top5Set = getTop5NickSet(filtered);
+
+      elTbody.innerHTML = filtered.map((r, i) => {
+        const isTop5 = top5Set.has(r.nick);
+        const rc = roleClass(r.role);
+
+        const topBadge = isTop5
+          ? `<span class="top5-badge"><span class="c"></span>TOP5</span>`
+          : ``;
+
+        return `
+        <tr class="${isTop5 ? "top5" : ""}">
+          <td class="muted">${i + 1}</td>
+          <td>${topBadge}${escapeHtml(r.nick)}</td>
+          <td>
+            <span class="role-pill ${rc}">
+              ${escapeHtml(r.role || "-")}
+            </span>
+          </td>
+          <td class="right">${formatEok(r.power)}</td>
+          <td class="note-col" title="${escapeHtml(r.note)}">${escapeHtml(r.note)}</td>
+        </tr>
+      `;
+      }).join("");
+
+      updateSortIndicators();
+      updateGuildInfo();
+    }
+
+    function getTierLabel() { return currentTier === "ALL" ? "ALL" : `공인${currentTier}`; }
+    function csvEscape(v) {
+      const s = String(v ?? "");
+      if (/[",\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
+      return s;
+    }
+    function makeExportCSV(rows) {
+      const header = ["닉네임", "직위", "전투력(억)", "비고"];
+      const lines = [header.join(",")];
+      rows.forEach((r) => {
+        lines.push([
+          csvEscape(r.nick),
+          csvEscape(r.role),
+          Number(r.power || 0),
+          csvEscape(r.note || "")
+        ].join(","));
+      });
+      return lines.join("\n");
+    }
+    function downloadTextFile(filename, content, mime = "text/csv;charset=utf-8") {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+    elExport.addEventListener("click", () => {
+      const label = getTierLabel();
+      const q = (currentQuery || "").trim();
+      const fileBase = q ? `${label}_길드원_리스트_검색` : `${label}_길드원_리스트`;
+      downloadTextFile(`${fileBase}.csv`, makeExportCSV(viewRows));
+    });
+
+    elSeg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-tier]");
+      if (!btn) return;
+
+      currentTier = btn.dataset.tier;
+      elSeg.querySelectorAll("button[data-tier]").forEach(b => b.classList.toggle("active", b === btn));
+
+      updateGuildInfo();
+      loadByCurrentTier();
+    });
+
+    elQ.addEventListener("input", () => {
+      currentQuery = elQ.value || "";
+      render();
+    });
+
+    elThead.addEventListener("click", (e) => {
+      const th = e.target.closest("th[data-key]");
+      if (!th) return;
+
+      const key = th.dataset.key;
+      if (key === "rowno") return;
+
+      if (sortKey === key) {
+        sortDir = (sortDir === "asc") ? "desc" : "asc";
+      } else {
+        sortKey = key;
+        sortDir = (key === "power") ? "desc" : "asc";
+      }
+      render();
+    });
+
+    updateGuildInfo();
+    loadByCurrentTier();
+  </script>
+
+</body>
+
+</html>
