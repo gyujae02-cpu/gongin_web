@@ -1,28 +1,31 @@
 (() => {
     "use strict";
 
-    // ===== 관리자 비밀번호 (배포 시 교체 가능)
-    // 정적 사이트라 완전한 보안은 불가. "편집 방지" 목적의 UX 락으로 봐야 함.
-    const ADMIN_PASSWORD = "1234";
-
+    // ===== 관리자 비밀번호 (UX 락 용도)
+    const ADMIN_PASSWORD = "edit58778285";
     const AUTH_KEY = "guild_auth_v1";
-
-    const CSV_FILES = {
-        1: "공인1_길드원_리스트.csv",
-        2: "공인2_길드원_리스트.csv",
-        3: "공인3_길드원_리스트.csv",
-        4: "공인4_길드원_리스트.csv",
-        5: "공인5_길드원_리스트.csv",
-    };
-
     const MODE_KEY = "guild_view_mode_v1";
 
-    // ✅ CSV 캐시 강제 무효화 (새로고침할 때마다 값이 바뀌어서 항상 최신 CSV를 받음)
-    const CSV_BUST = Date.now();
+    // ===== Google Sheets (읽기: CSV)
+    // members 시트: tier,nick,role,power_eok,note
+    const SHEET_ID = "1Ac1K6_LX2VfhkHi4M8yLimywQlLseQl8F9_krYsbM1k";
+    const SHEET_NAME = "members";
+    const SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+        SHEET_NAME
+    )}`;
 
-    // ===== Elements (HTML 변경 반영)
+    // ===== Apps Script Web App (쓰기: upsert/delete)
+    const GAS_WEBAPP_URL =
+        "https://script.google.com/macros/s/AKfycbw3jn84qIiTLloFAq3jtmsUytuf1uxtuTlmemzjPgvkhqYDSSTUc4Mttn7OZhONe4kN/exec";
+
+    // (선택) Apps Script에서 토큰 검증을 쓰고 싶으면:
+    // 1) Apps Script 코드에서 REQUIRED 토큰 주석 해제
+    // 2) 아래 API_TOKEN 동일하게 맞추기
+    const API_TOKEN = ""; // 예: "change-me"
+
+    // ===== Elements
     const elLogout = document.getElementById("logoutBtn");
-    const elExport = document.getElementById("exportBtn");
+    // const elExport = document.getElementById("exportBtn");
     const elAdd = document.getElementById("addBtn");
     const elEditModeBtn = document.getElementById("editModeBtn");
 
@@ -48,14 +51,20 @@
 
     // Admin modal
     const adminModalEl = document.getElementById("adminModal");
-    const adminModal = new bootstrap.Modal(adminModalEl, { backdrop: "static", keyboard: true });
+    const adminModal = new bootstrap.Modal(adminModalEl, {
+        backdrop: "static",
+        keyboard: true,
+    });
     const elAdminPw = document.getElementById("adminPw");
     const elAdminErr = document.getElementById("adminErr");
     const elAdminOkBtn = document.getElementById("adminOkBtn");
 
     // Member modal
     const memberModalEl = document.getElementById("memberModal");
-    const memberModal = new bootstrap.Modal(memberModalEl, { backdrop: "static", keyboard: true });
+    const memberModal = new bootstrap.Modal(memberModalEl, {
+        backdrop: "static",
+        keyboard: true,
+    });
 
     const elModalTitle = document.getElementById("modalTitle");
     const elMTier = document.getElementById("mTier");
@@ -74,17 +83,24 @@
     let sortDir = "desc";
     let editEnabled = false;
 
-    // 데이터는 "메모리"에만 존재
-    const cache = new Map(); // tier -> rows
-    let allRows = [];
-    let viewRows = [];
-    let editing = null; // { tier, id }
+    // 시트에서 로드한 원본 데이터(전체)
+    let sheetRows = []; // {tier,nick,role,power,note}
+    let allRows = []; // tier filter 적용 후(ALL이면 전체)
+    let viewRows = []; // query+sort 적용 후
+    let editing = null; // { oldTier, oldNick }  (시트 키 기준)
 
     // ===== Utils
-    function setLoading(on) { elLoading.style.display = on ? "block" : "none"; }
+    function setLoading(on) {
+        elLoading.style.display = on ? "block" : "none";
+    }
     function showError(msg) {
-        if (!msg) { elError.style.display = "none"; elError.textContent = ""; return; }
-        elError.style.display = "block"; elError.textContent = msg;
+        if (!msg) {
+            elError.style.display = "none";
+            elError.textContent = "";
+            return;
+        }
+        elError.style.display = "block";
+        elError.textContent = msg;
     }
 
     function escapeHtml(s) {
@@ -97,7 +113,10 @@
     }
 
     function toNumberSafe(v) {
-        const s = String(v ?? "").trim().replaceAll("억", "").replaceAll(",", "");
+        const s = String(v ?? "")
+            .trim()
+            .replaceAll("억", "")
+            .replaceAll(",", "");
         const n = Number(s);
         return Number.isFinite(n) ? n : 0;
     }
@@ -110,18 +129,13 @@
         return Number.isInteger(v) ? v.toString() : v.toFixed(1);
     }
 
-    // ✅ 전투력 "억" 입력값을 기준으로, 1조(=10000억) 이상이면 조/억 같이 표시
-    // 예) 9999.9 -> "9999.9억"
-    //     10000 -> "1조"
-    //     12345.6 -> "1조 2345.6억"
+    // ✅ 전투력(억) 표시: 1조(=10000억) 이상이면 조/억 같이 표시
     function formatPowerKor(eokValue) {
         const v = round1Number(eokValue);
         const abs = Math.abs(v);
         const sign = v < 0 ? "-" : "";
 
-        if (abs < 10000) {
-            return `${sign}${round1Str(abs)}억`;
-        }
+        if (abs < 10000) return `${sign}${round1Str(abs)}억`;
 
         const jo = Math.floor(abs / 10000);
         const remEok = round1Number(abs - jo * 10000);
@@ -130,9 +144,10 @@
         return `${sign}${jo}조 ${round1Str(remEok)}억`;
     }
 
-    function isMobileLike() { return window.matchMedia("(max-width: 575px)").matches; }
+    function isMobileLike() {
+        return window.matchMedia("(max-width: 575px)").matches;
+    }
 
-    // nav 버튼 내부 구조(아이콘 + 텍스트) 유지하면서 텍스트만 변경
     function setNavBtnText(btnEl, text) {
         const t = btnEl?.querySelector?.(".navx-txt");
         if (t) t.textContent = text;
@@ -140,18 +155,16 @@
     }
 
     function applyMode(mode) {
-        const m = (mode === "cards") ? "cards" : "table";
+        const m = mode === "cards" ? "cards" : "table";
         localStorage.setItem(MODE_KEY, m);
 
         elViewRoot.classList.toggle("mode-table", m === "table");
         elViewRoot.classList.toggle("mode-cards", m === "cards");
 
-        // ✅ 버튼 구조 유지
-        setNavBtnText(elModeBtn, (m === "cards") ? "모드: 카드" : "모드: 테이블");
+        setNavBtnText(elModeBtn, m === "cards" ? "모드: 카드" : "모드: 테이블");
 
-        // sortbar: 모바일에서는 항상 보이게(카드 모드 조작에 도움)
         if (isMobileLike()) elSortbar.style.display = "flex";
-        else elSortbar.style.display = (m === "cards") ? "flex" : "none";
+        else elSortbar.style.display = m === "cards" ? "flex" : "none";
     }
 
     function getModePref() {
@@ -168,25 +181,31 @@
 
     function setEditEnabled(on) {
         editEnabled = !!on;
-
-        // ✅ 버튼 구조 유지
         setNavBtnText(elEditModeBtn, `편집: ${editEnabled ? "ON" : "OFF"}`);
-
         elEditModeBtn.classList.toggle("primary", editEnabled);
         elAdd.disabled = !editEnabled;
-
         render();
     }
 
-    // ===== CSV parse
+    // ===== CSV parse (구글시트 CSV)
     function parseCSV(text) {
         const rows = [];
-        let i = 0, field = "", row = [], inQuotes = false;
+        let i = 0,
+            field = "",
+            row = [],
+            inQuotes = false;
 
-        function pushField() { row.push(field); field = ""; }
+        function pushField() {
+            row.push(field);
+            field = "";
+        }
         function pushRow() {
+            // 빈줄 skip
             const joined = row.join("").trim();
-            if (joined.length === 0) { row = []; return; }
+            if (joined.length === 0) {
+                row = [];
+                return;
+            }
             rows.push(row);
             row = [];
         }
@@ -196,91 +215,111 @@
             if (inQuotes) {
                 if (c === '"') {
                     const next = text[i + 1];
-                    if (next === '"') { field += '"'; i += 2; continue; }
-                    inQuotes = false; i++; continue;
+                    if (next === '"') {
+                        field += '"';
+                        i += 2;
+                        continue;
+                    }
+                    inQuotes = false;
+                    i++;
+                    continue;
                 }
-                field += c; i++; continue;
+                field += c;
+                i++;
+                continue;
             } else {
-                if (c === '"') { inQuotes = true; i++; continue; }
-                if (c === ",") { pushField(); i++; continue; }
-                if (c === "\r") { i++; continue; }
-                if (c === "\n") { pushField(); pushRow(); i++; continue; }
-                field += c; i++; continue;
+                if (c === '"') {
+                    inQuotes = true;
+                    i++;
+                    continue;
+                }
+                if (c === ",") {
+                    pushField();
+                    i++;
+                    continue;
+                }
+                if (c === "\r") {
+                    i++;
+                    continue;
+                }
+                if (c === "\n") {
+                    pushField();
+                    pushRow();
+                    i++;
+                    continue;
+                }
+                field += c;
+                i++;
+                continue;
             }
         }
-        pushField(); pushRow();
+        pushField();
+        pushRow();
         return rows;
     }
 
-    function normHeader(h) { return String(h ?? "").trim().replaceAll(" ", "").replaceAll("\t", ""); }
+    function normHeader(h) {
+        return String(h ?? "").trim().replaceAll(" ", "").replaceAll("\t", "");
+    }
 
-    function mapCSVToRows(tier, csvText) {
+    function mapSheetCSVToRows(csvText) {
         const grid = parseCSV(csvText);
         if (grid.length < 2) return [];
 
         const header = grid[0].map(normHeader);
 
-        const nickI = header.findIndex(h => h === "닉네임" || h === "nickname");
-        const roleI = header.findIndex(h => h === "직위" || h === "직책" || h === "role");
-        // ✅ "전투력(억)" / "전투력" 둘 다 인식
-        const powI = header.findIndex(h => h === "전투력(억)" || h === "전투력" || h === "power");
-        const noteI = header.findIndex(h => h === "비고" || h === "note");
+        const tierI = header.findIndex((h) => h === "tier");
+        const nickI = header.findIndex((h) => h === "nick");
+        const roleI = header.findIndex((h) => h === "role");
+        const powI = header.findIndex((h) => h === "power_eok");
+        const noteI = header.findIndex((h) => h === "note");
 
-        if (nickI < 0 || roleI < 0 || powI < 0 || noteI < 0) {
-            throw new Error("CSV 헤더가 올바르지 않습니다. (닉네임, 직위, 전투력, 비고)");
+        if (tierI < 0 || nickI < 0 || roleI < 0 || powI < 0 || noteI < 0) {
+            throw new Error(
+                "members 시트 헤더가 올바르지 않습니다. tier,nick,role,power_eok,note"
+            );
         }
 
         const out = [];
         for (let r = 1; r < grid.length; r++) {
             const line = grid[r];
+            const tier = Number(String(line[tierI] ?? "").trim());
             const nick = String(line[nickI] ?? "").trim();
-            if (!nick) continue;
+            if (!tier || !nick) continue;
 
             out.push({
-                id: `${tier}:${nick}:${r}`,
-                tier: Number(tier),
+                tier,
                 nick,
                 role: String(line[roleI] ?? "").trim(),
-                power: toNumberSafe(line[powI]), // 입력은 "억" 기준 숫자
+                power: toNumberSafe(line[powI]), // 억 기준
                 note: String(line[noteI] ?? "").trim(),
             });
         }
         return out;
     }
 
-    async function loadTier(tier) {
-        const t = Number(tier);
-        if (cache.has(t)) return cache.get(t);
-
-        const file = CSV_FILES[t];
-
-        // ✅ 캐시 버스트 적용: URL이 매번 달라져서 브라우저/Pages 캐시를 우회
-        const url = `${encodeURI(file)}?v=${CSV_BUST}`;
-        const res = await fetch(url, { cache: "no-store" });
-
-        if (!res.ok) throw new Error(`CSV를 불러오지 못했습니다: ${file} (HTTP ${res.status})`);
-
-        const text = await res.text();
-        const rows = mapCSVToRows(t, text);
-
-        cache.set(t, rows);
-        return rows;
+    function keyOf(tier, nick) {
+        return `${Number(tier)}:${String(nick || "").trim()}`.toLowerCase();
     }
 
-    async function loadByCurrentTier() {
+    // ===== Load (Google Sheets CSV)
+    async function loadFromSheet() {
         showError(null);
         setLoading(true);
+
         try {
-            if (currentTier === "ALL") {
-                // ✅ 공인 1~5까지 전부 합산
-                const list = await Promise.all([1, 2, 3, 4, 5].map(loadTier));
-                allRows = list.flat();
-            } else {
-                allRows = await loadTier(currentTier);
-            }
+            // ✅ 매번 최신 강제 (캐시 꼬임 방지)
+            const url = `${SHEET_CSV_URL}&t=${Date.now()}`;
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) throw new Error(`시트를 불러오지 못했습니다 (HTTP ${res.status})`);
+            const text = await res.text();
+            sheetRows = mapSheetCSVToRows(text);
+
+            applyTierToAllRows();
             render();
         } catch (err) {
-            allRows = [];
+            sheetRows = [];
+            applyTierToAllRows();
             render();
             showError(String(err?.message || err));
         } finally {
@@ -288,14 +327,24 @@
         }
     }
 
+    function applyTierToAllRows() {
+        if (currentTier === "ALL") {
+            allRows = sheetRows.slice();
+        } else {
+            const t = Number(currentTier);
+            allRows = sheetRows.filter((x) => Number(x.tier) === t);
+        }
+    }
+
     // ===== Filter / Sort
     function applyQuery(rows) {
         const q = currentQuery.trim().toLowerCase();
         if (!q) return rows;
-        return rows.filter(x => (`${x.nick} ${x.role} ${x.note}`).toLowerCase().includes(q));
+        return rows.filter((x) =>
+            `${x.nick} ${x.role} ${x.note}`.toLowerCase().includes(q)
+        );
     }
 
-    // 직위 라벨/칩 클래스
     function roleLabel(roleRaw) {
         const r = String(roleRaw || "").trim();
         if (r === "마스터") return "길드 마스터";
@@ -308,8 +357,6 @@
         if (r === "다운증후군") return "chip role-sub";
         return "chip role-normal";
     }
-
-    // 정렬 우선순위(기존 로직 유지 + 라벨 기반)
     function roleSortRank(role) {
         const r = String(role || "").trim();
         if (r === "마스터") return 0;
@@ -318,7 +365,7 @@
     }
 
     function compare(a, b) {
-        const dir = (sortDir === "asc") ? 1 : -1;
+        const dir = sortDir === "asc" ? 1 : -1;
 
         if (sortKey === "role") {
             const ar = roleSortRank(a.role);
@@ -339,25 +386,24 @@
     }
 
     function updateSortIndicators() {
-        elThead.querySelectorAll("[data-si]").forEach(s => s.textContent = "");
+        elThead.querySelectorAll("[data-si]").forEach((s) => (s.textContent = ""));
         const target = elThead.querySelector(`[data-si="${sortKey}"]`);
-        if (target) target.textContent = (sortDir === "asc") ? "▲" : "▼";
+        if (target) target.textContent = sortDir === "asc" ? "▲" : "▼";
     }
 
-    // ===== TOP10 rank map (nick -> 1..10)
     function getTop10RankMap(rows) {
-        const top = rows.slice()
+        const top = rows
+            .slice()
             .sort((a, b) => Number(b.power || 0) - Number(a.power || 0))
             .slice(0, 10);
 
         const map = new Map();
-        top.forEach((x, idx) => map.set(x.nick, idx + 1));
+        top.forEach((x, idx) => map.set(keyOf(x.tier, x.nick), idx + 1));
         return map;
     }
 
-    // ===== Note expand toggle (table + cards)
     function bindNoteToggle(rootEl) {
-        rootEl.querySelectorAll(".note, .mnote").forEach(el => {
+        rootEl.querySelectorAll(".note, .mnote").forEach((el) => {
             if (el.dataset.bound === "1") return;
             el.dataset.bound = "1";
             el.addEventListener("click", () => el.classList.toggle("expanded"));
@@ -369,14 +415,13 @@
         viewRows = filtered;
 
         const count = filtered.length;
-        const powers = filtered.map(x => Number(x.power || 0)); // "억" 기준 숫자
+        const powers = filtered.map((x) => Number(x.power || 0));
         const sum = powers.reduce((acc, v) => acc + v, 0);
-        const avg = count ? (sum / count) : 0;
+        const avg = count ? sum / count : 0;
         const max = count ? Math.max(...powers) : 0;
         const min = count ? Math.min(...powers) : 0;
 
         elStatCount.textContent = `${count}명`;
-        // ✅ 통계도 조/억 같이 표시
         elStatSum.textContent = formatPowerKor(sum);
         elStatAvg.textContent = formatPowerKor(avg);
         elStatMax.textContent = formatPowerKor(max);
@@ -384,97 +429,107 @@
 
         const top10RankMap = getTop10RankMap(filtered);
 
-        const actionButtons = (id) => {
+        const actionButtons = (tier, nick) => {
             const disabled = editEnabled ? "" : "disabled";
             const title = editEnabled ? "" : `title="편집 모드에서만 가능합니다"`;
+            const key = escapeHtml(keyOf(tier, nick));
             return `
         <div class="row-actions">
-          <button class="btnx primary" data-act="edit" data-id="${escapeHtml(id)}" ${disabled} ${title}>수정</button>
-          <button class="btnx danger"  data-act="del"  data-id="${escapeHtml(id)}" ${disabled} ${title}>삭제</button>
+          <button class="btnx primary" data-act="edit" data-key="${key}" ${disabled} ${title}>수정</button>
+          <button class="btnx danger"  data-act="del"  data-key="${key}" ${disabled} ${title}>삭제</button>
         </div>
       `;
         };
 
         // ===== Table
-        elTbody.innerHTML = filtered.map((r, i) => {
-            const rank = top10RankMap.get(r.nick);
-            const topBadge = rank ? `<span class="top-rank">TOP${rank}</span>` : "";
+        elTbody.innerHTML = filtered
+            .map((r, i) => {
+                const rank = top10RankMap.get(keyOf(r.tier, r.nick));
+                const topBadge = rank ? `<span class="top-rank">TOP${rank}</span>` : "";
 
-            const roleText = roleLabel(r.role);
-            const roleChipClass = roleClass(r.role);
+                const roleText = roleLabel(r.role);
+                const roleChipClass = roleClass(r.role);
+                const noteSafe = escapeHtml(r.note || "-");
 
-            // note: tooltip 제거, ellipsis + click expand
-            const noteSafe = escapeHtml(r.note || "-");
-
-            return `
-        <tr>
-          <td class="muted">${i + 1}</td>
-          <td><span class="nick">${escapeHtml(r.nick)}</span></td>
-          <td><span class="${roleChipClass}">${escapeHtml(roleText)}</span></td>
-          <td class="right">
-            <span class="power-cell">
-              <span class="power-num">${formatPowerKor(r.power)}</span>
-              ${topBadge}
-            </span>
-          </td>
-          <td><span class="note" title="">${noteSafe}</span></td>
-          <td>${actionButtons(r.id)}</td>
-        </tr>
-      `;
-        }).join("");
+                return `
+          <tr>
+            <td class="muted">${i + 1}</td>
+            <td><span class="nick">${escapeHtml(r.nick)}</span></td>
+            <td><span class="${roleChipClass}">${escapeHtml(roleText)}</span></td>
+            <td class="right">
+              <span class="power-cell">
+                <span class="power-num">${formatPowerKor(r.power)}</span>
+                ${topBadge}
+              </span>
+            </td>
+            <td><span class="note" title="">${noteSafe}</span></td>
+            <td>${actionButtons(r.tier, r.nick)}</td>
+          </tr>
+        `;
+            })
+            .join("");
 
         updateSortIndicators();
 
         // ===== Cards
-        elCards.innerHTML = filtered.map((r, i) => {
-            const rank = top10RankMap.get(r.nick);
-            const topBadge = rank ? `<span class="top-rank">TOP${rank}</span>` : "";
+        elCards.innerHTML = filtered
+            .map((r, i) => {
+                const rank = top10RankMap.get(keyOf(r.tier, r.nick));
+                const roleText = roleLabel(r.role);
+                const roleChipClass = roleClass(r.role);
 
-            const roleText = roleLabel(r.role);
-            const roleChipClass = roleClass(r.role);
+                const disabled = editEnabled ? "" : "disabled";
+                const title = editEnabled ? "" : `title="편집 모드에서만 가능합니다"`;
+                const key = escapeHtml(keyOf(r.tier, r.nick));
 
-            const disabled = editEnabled ? "" : "disabled";
-            const title = editEnabled ? "" : `title="편집 모드에서만 가능합니다"`;
+                return `
+          <div class="mcard">
+            <div class="mcard-top">
+              <div style="min-width:0;">
+                <div class="mcard-name">
+                  <span class="muted" style="margin-right:6px;">${i + 1}.</span>
+                  <span class="nick">${escapeHtml(r.nick)}</span>
+                </div>
 
-            return `
-        <div class="mcard">
-          <div class="mcard-top">
-            <div style="min-width:0;">
-              <div class="mcard-name">
-                <span class="muted" style="margin-right:6px;">${i + 1}.</span>
-                <span class="nick">${escapeHtml(r.nick)}</span>
-              </div>
-
-              <div class="mcard-meta" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
-                <span class="${roleChipClass}">${escapeHtml(roleText)}</span>
-                <span class="chip role-normal">전투력 <span style="margin-left:6px; font-weight:950;">${formatPowerKor(r.power)}</span></span>
-                ${rank ? `<span class="top-rank">TOP${rank}</span>` : ""}
-                <span class="chip role-normal">공인 <span style="margin-left:6px; font-weight:950;">${r.tier}</span></span>
+                <div class="mcard-meta" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+                  <span class="${roleChipClass}">${escapeHtml(roleText)}</span>
+                  <span class="chip role-normal">전투력 <span style="margin-left:6px; font-weight:950;">${formatPowerKor(
+                    r.power
+                )}</span></span>
+                  ${rank ? `<span class="top-rank">TOP${rank}</span>` : ""}
+                  <span class="chip role-normal">공인 <span style="margin-left:6px; font-weight:950;">${escapeHtml(
+                    r.tier
+                )}</span></span>
+                </div>
               </div>
             </div>
+
+            <div class="mnote">${escapeHtml(r.note || "-")}</div>
+
+            <div class="mcard-actions">
+              <button class="btnx primary" data-act="edit" data-key="${key}" ${disabled} ${title}>수정</button>
+              <button class="btnx danger"  data-act="del"  data-key="${key}" ${disabled} ${title}>삭제</button>
+            </div>
           </div>
+        `;
+            })
+            .join("");
 
-          <div class="mnote">${escapeHtml(r.note || "-")}</div>
-
-          <div class="mcard-actions">
-            <button class="btnx primary" data-act="edit" data-id="${escapeHtml(r.id)}" ${disabled} ${title}>수정</button>
-            <button class="btnx danger"  data-act="del"  data-id="${escapeHtml(r.id)}" ${disabled} ${title}>삭제</button>
-          </div>
-        </div>
-      `;
-        }).join("");
-
-        // note expand bind (table + cards)
         bindNoteToggle(document);
     }
 
-    function findRowById(id) {
-        return allRows.find(x => x.id === id) || null;
+    function findRowByKey(k) {
+        const key = String(k || "").toLowerCase();
+        return sheetRows.find((x) => keyOf(x.tier, x.nick) === key) || null;
     }
 
-    // ===== 편집(메모리만)
+    // ===== Modal helpers
     function setModalErr(msg) {
-        if (!msg) { elModalErr.style.display = "none"; elModalErr.textContent = ""; return; }
+        if (!msg) {
+            elModalErr.style.display = "none";
+            elModalErr.textContent = "";
+            return;
+        }
         elModalErr.style.display = "block";
         elModalErr.textContent = msg;
     }
@@ -485,10 +540,10 @@
         elDeleteBtn.classList.add("d-none");
         setModalErr("");
 
-        elMTier.value = (currentTier === "ALL") ? "1" : String(currentTier);
+        elMTier.value = currentTier === "ALL" ? "1" : String(currentTier);
         elMNick.value = "";
         elMRole.value = "";
-        elMPower.value = ""; // 입력은 "억" 기준 숫자
+        elMPower.value = ""; // 억 기준 숫자
         elMNote.value = "";
 
         memberModal.show();
@@ -496,7 +551,7 @@
     }
 
     function openModalForEdit(row) {
-        editing = { tier: row.tier, id: row.id };
+        editing = { oldTier: row.tier, oldNick: row.nick };
         elModalTitle.textContent = "길드원 수정";
         elDeleteBtn.classList.remove("d-none");
         setModalErr("");
@@ -504,7 +559,7 @@
         elMTier.value = String(row.tier);
         elMNick.value = row.nick || "";
         elMRole.value = row.role || "";
-        elMPower.value = String(row.power ?? ""); // 억 기준
+        elMPower.value = String(row.power ?? "");
         elMNote.value = row.note || "";
 
         memberModal.show();
@@ -515,58 +570,96 @@
         const tier = Number(elMTier.value || 1);
         const nick = String(elMNick.value || "").trim();
         const role = String(elMRole.value || "").trim();
-        const power = toNumberSafe(elMPower.value); // 억 기준
+        const power_eok = toNumberSafe(elMPower.value); // 억 기준
         const note = String(elMNote.value || "").trim();
 
+        if (!tier || tier < 1 || tier > 5)
+            return { ok: false, msg: "공인은 1~5만 가능합니다." };
         if (!nick) return { ok: false, msg: "닉네임을 입력해 주세요." };
         if (!role) return { ok: false, msg: "직위를 입력해 주세요." };
-        if (power < 0) return { ok: false, msg: "전투력은 0 이상이어야 합니다." };
+        if (power_eok < 0) return { ok: false, msg: "전투력은 0 이상이어야 합니다." };
 
-        // tier 내 닉네임 중복 방지(현재 캐시 기준)
-        const tierRows = cache.get(tier) || [];
-        const dup = tierRows.find(x =>
-            String(x.nick).trim().toLowerCase() === nick.toLowerCase() &&
-            (!editing || x.id !== editing.id)
-        );
-        if (dup) return { ok: false, msg: "같은 공인 그룹에 동일 닉네임이 이미 존재합니다." };
+        // 같은 tier에서 nick 중복 체크 (편집이면 oldKey는 허용)
+        const newKey = keyOf(tier, nick);
+        const dup = sheetRows.find((x) => keyOf(x.tier, x.nick) === newKey);
+        if (dup) {
+            if (!editing) return { ok: false, msg: "같은 공인에 동일 닉네임이 이미 존재합니다." };
+            const oldKey = keyOf(editing.oldTier, editing.oldNick);
+            if (oldKey !== newKey) return { ok: false, msg: "같은 공인에 동일 닉네임이 이미 존재합니다." };
+        }
 
-        // id 유지(편집), 신규는 timestamp로 생성
-        const id = editing ? editing.id : `${tier}:${nick}:${Date.now().toString(16)}`;
-        return { ok: true, row: { id, tier, nick, role, power, note } };
+        return {
+            ok: true,
+            row: { tier, nick, role, power_eok, note },
+        };
     }
 
-    function upsertRowInTier(tier, row) {
-        const t = Number(tier);
-        const rows = (cache.get(t) || []).slice();
-        const idx = rows.findIndex(x => x.id === row.id);
-        if (idx >= 0) rows[idx] = row;
-        else rows.push(row);
-        cache.set(t, rows);
+    // ===== Apps Script API (쓰기)
+    async function apiPost(payload) {
+        // ✅ text/plain 으로 보내면 프리플라이트를 피하는 경우가 많아서 GitHub Pages에서 안정적
+        const res = await fetch(GAS_WEBAPP_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload),
+        });
+
+        // Apps Script는 200이 와도 본문이 오류일 수 있어 JSON 확인
+        const txt = await res.text();
+        let j = null;
+        try {
+            j = JSON.parse(txt);
+        } catch {
+            throw new Error(`서버 응답 파싱 실패: ${txt.slice(0, 200)}`);
+        }
+        if (!j.ok) throw new Error(j.message || "요청 실패");
+        return j;
     }
 
-    function deleteRowInTier(tier, id) {
-        const t = Number(tier);
-        const rows = (cache.get(t) || []).filter(x => x.id !== id);
-        cache.set(t, rows);
+    async function apiUpsert(row) {
+        return apiPost({
+            action: "upsert",
+            token: API_TOKEN || "",
+            row: {
+                tier: row.tier,
+                nick: row.nick,
+                role: row.role,
+                power_eok: row.power_eok,
+                note: row.note,
+            },
+        });
     }
 
-    // ===== Export
-    function getTierLabel() { return currentTier === "ALL" ? "ALL" : `공인${currentTier}`; }
+    async function apiDeleteByKey(key) {
+        return apiPost({
+            action: "delete",
+            token: API_TOKEN || "",
+            key,
+        });
+    }
+
+    // ===== Export (현재 표시 기준 CSV)
+    function getTierLabel() {
+        return currentTier === "ALL" ? "ALL" : `공인${currentTier}`;
+    }
     function csvEscape(v) {
         const s = String(v ?? "");
         if (/[",\n]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
         return s;
     }
     function makeExportCSV(rows) {
-        const header = ["닉네임", "직위", "전투력", "비고"]; // export 값은 억 기준 숫자로 유지
+        // export는 시트 컬럼 맞춤
+        const header = ["tier", "nick", "role", "power_eok", "note"];
         const lines = [header.join(",")];
         rows.forEach((r) => {
-            lines.push([
-                csvEscape(r.nick),
-                csvEscape(r.role),
-                Number(r.power || 0),
-                csvEscape(r.note || "")
-            ].join(","));
+            lines.push(
+                [
+                    Number(r.tier || 0),
+                    csvEscape(r.nick),
+                    csvEscape(r.role),
+                    Number(r.power || 0),
+                    csvEscape(r.note || ""),
+                ].join(",")
+            );
         });
         return lines.join("\n");
     }
@@ -584,7 +677,11 @@
 
     // ===== Admin modal helpers
     function setAdminErr(msg) {
-        if (!msg) { elAdminErr.style.display = "none"; elAdminErr.textContent = ""; return; }
+        if (!msg) {
+            elAdminErr.style.display = "none";
+            elAdminErr.textContent = "";
+            return;
+        }
         elAdminErr.style.display = "block";
         elAdminErr.textContent = msg;
     }
@@ -634,9 +731,12 @@
         if (!btn) return;
 
         currentTier = btn.dataset.tier;
-        elSeg.querySelectorAll("button[data-tier]").forEach(b => b.classList.toggle("active", b === btn));
+        elSeg
+            .querySelectorAll("button[data-tier]")
+            .forEach((b) => b.classList.toggle("active", b === btn));
 
-        await loadByCurrentTier();
+        applyTierToAllRows();
+        render();
     });
 
     // Search
@@ -653,10 +753,10 @@
         const key = th.dataset.key;
         if (key === "rowno") return;
 
-        if (sortKey === key) sortDir = (sortDir === "asc") ? "desc" : "asc";
+        if (sortKey === key) sortDir = sortDir === "asc" ? "desc" : "asc";
         else {
             sortKey = key;
-            sortDir = (key === "power") ? "desc" : "asc";
+            sortDir = key === "power" ? "desc" : "asc";
         }
 
         elSortKeySel.value = sortKey;
@@ -675,7 +775,7 @@
     });
 
     elSortDirPill.addEventListener("click", () => {
-        sortDir = (sortDir === "asc") ? "desc" : "asc";
+        sortDir = sortDir === "asc" ? "desc" : "asc";
         syncSortDirPill();
         render();
     });
@@ -688,15 +788,15 @@
     });
 
     // Row actions
-    document.addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-act][data-id]");
+    document.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button[data-act][data-key]");
         if (!btn) return;
         if (!editEnabled) return;
 
         const act = btn.dataset.act;
-        const id = btn.dataset.id;
+        const key = btn.dataset.key;
 
-        const row = findRowById(id);
+        const row = findRowByKey(key);
         if (!row) return;
 
         if (act === "edit") {
@@ -706,8 +806,17 @@
 
         if (act === "del") {
             if (!confirm(`삭제할까요?\n\n${row.nick} (${roleLabel(row.role)})`)) return;
-            deleteRowInTier(row.tier, row.id);
-            loadByCurrentTier();
+
+            try {
+                setLoading(true);
+                showError(null);
+                await apiDeleteByKey(keyOf(row.tier, row.nick));
+                await loadFromSheet(); // 저장 후 즉시 최신 반영
+            } catch (err) {
+                showError(String(err?.message || err));
+            } finally {
+                setLoading(false);
+            }
         }
     });
 
@@ -716,45 +825,67 @@
         if (!editEnabled) return;
 
         const v = validateAndBuildRow();
-        if (!v.ok) { setModalErr(v.msg); return; }
+        if (!v.ok) {
+            setModalErr(v.msg);
+            return;
+        }
         setModalErr("");
 
-        // tier가 바뀌는 경우: 기존 tier에서 삭제 후 신규 tier로 추가
-        if (editing) {
-            const oldTier = Number(editing.tier);
-            const newTier = Number(v.row.tier);
-            if (oldTier !== newTier) {
-                deleteRowInTier(oldTier, editing.id);
-                v.row.id = `${newTier}:${v.row.nick}:${Date.now().toString(16)}`;
-            }
-        }
+        try {
+            setLoading(true);
+            showError(null);
 
-        upsertRowInTier(v.row.tier, v.row);
-        memberModal.hide();
-        await loadByCurrentTier();
+            // ✅ 닉네임/공인 변경 시: 기존 키 삭제 후 upsert (중복/잔존 방지)
+            if (editing) {
+                const oldKey = keyOf(editing.oldTier, editing.oldNick);
+                const newKey = keyOf(v.row.tier, v.row.nick);
+                if (oldKey !== newKey) {
+                    await apiDeleteByKey(oldKey);
+                }
+            }
+
+            await apiUpsert(v.row);
+            memberModal.hide();
+
+            await loadFromSheet();
+        } catch (err) {
+            setModalErr(String(err?.message || err));
+        } finally {
+            setLoading(false);
+        }
     });
 
     // Delete in modal
     elDeleteBtn.addEventListener("click", async () => {
         if (!editEnabled || !editing) return;
 
-        const row = findRowById(editing.id);
+        const oldKey = keyOf(editing.oldTier, editing.oldNick);
+        const row = findRowByKey(oldKey);
         if (!row) return;
 
         if (!confirm(`삭제할까요?\n\n${row.nick} (${roleLabel(row.role)})`)) return;
 
-        deleteRowInTier(row.tier, row.id);
-        memberModal.hide();
-        await loadByCurrentTier();
+        try {
+            setLoading(true);
+            showError(null);
+
+            await apiDeleteByKey(oldKey);
+            memberModal.hide();
+            await loadFromSheet();
+        } catch (err) {
+            showError(String(err?.message || err));
+        } finally {
+            setLoading(false);
+        }
     });
 
     // Export (현재 표시 기준)
-    elExport.addEventListener("click", () => {
-        const label = getTierLabel();
-        const q = (currentQuery || "").trim();
-        const fileBase = q ? `${label}_길드원_리스트_검색` : `${label}_길드원_리스트`;
-        downloadTextFile(`${fileBase}.csv`, makeExportCSV(viewRows));
-    });
+    // elExport.addEventListener("click", () => {
+    //     const label = getTierLabel();
+    //     const q = (currentQuery || "").trim();
+    //     const fileBase = q ? `${label}_members_search` : `${label}_members`;
+    //     downloadTextFile(`${fileBase}.csv`, makeExportCSV(viewRows));
+    // });
 
     // ===== Init
     async function init() {
@@ -763,10 +894,8 @@
         syncSortDirPill();
         setEditEnabled(false);
 
-        // preload csv (실패해도 진행)
-        await Promise.all([1, 2, 3, 4, 5].map(loadTier).map(p => p.catch(() => [])));
-        await loadByCurrentTier();
+        await loadFromSheet();
     }
 
-    init().catch(err => showError(String(err?.message || err)));
+    init().catch((err) => showError(String(err?.message || err)));
 })();
