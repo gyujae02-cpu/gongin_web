@@ -99,18 +99,42 @@
         return Number.isFinite(n) ? n : 0;
     }
 
-    function formatEok(n) {
-        const v = Number(n || 0);
-        const isInt = Number.isInteger(v);
-        return (isInt ? v.toString() : v.toFixed(1)) + "억";
+    function round1Number(n) {
+        return Math.round((Number(n) || 0) * 10) / 10;
     }
-
-    function round1(n) {
-        const v = Math.round((Number(n) || 0) * 10) / 10;
+    function round1Str(n) {
+        const v = round1Number(n);
         return Number.isInteger(v) ? v.toString() : v.toFixed(1);
     }
 
+    // ✅ 전투력 "억" 입력값을 기준으로, 1조(=10000억) 이상이면 조/억 같이 표시
+    // 예) 9999.9 -> "9999.9억"
+    //     10000 -> "1조"
+    //     12345.6 -> "1조 2345.6억"
+    function formatPowerKor(eokValue) {
+        const v = round1Number(eokValue);
+        const abs = Math.abs(v);
+        const sign = v < 0 ? "-" : "";
+
+        if (abs < 10000) {
+            return `${sign}${round1Str(abs)}억`;
+        }
+
+        const jo = Math.floor(abs / 10000);
+        const remEok = round1Number(abs - jo * 10000);
+
+        if (remEok <= 0) return `${sign}${jo}조`;
+        return `${sign}${jo}조 ${round1Str(remEok)}억`;
+    }
+
     function isMobileLike() { return window.matchMedia("(max-width: 575px)").matches; }
+
+    // nav 버튼 내부 구조(아이콘 + 텍스트) 유지하면서 텍스트만 변경
+    function setNavBtnText(btnEl, text) {
+        const t = btnEl?.querySelector?.(".navx-txt");
+        if (t) t.textContent = text;
+        else if (btnEl) btnEl.textContent = text;
+    }
 
     function applyMode(mode) {
         const m = (mode === "cards") ? "cards" : "table";
@@ -119,9 +143,8 @@
         elViewRoot.classList.toggle("mode-table", m === "table");
         elViewRoot.classList.toggle("mode-cards", m === "cards");
 
-        // nav 버튼 텍스트
-        // (HTML에서 nav 버튼 안에 텍스트 span이 있지만 id는 modeBtn이라 그대로 textContent 조작해도 OK)
-        elModeBtn.textContent = (m === "cards") ? "모드: 카드" : "모드: 테이블";
+        // ✅ 버튼 구조 유지
+        setNavBtnText(elModeBtn, (m === "cards") ? "모드: 카드" : "모드: 테이블");
 
         // sortbar: 모바일에서는 항상 보이게(카드 모드 조작에 도움)
         if (isMobileLike()) elSortbar.style.display = "flex";
@@ -143,7 +166,9 @@
     function setEditEnabled(on) {
         editEnabled = !!on;
 
-        elEditModeBtn.textContent = `편집: ${editEnabled ? "ON" : "OFF"}`;
+        // ✅ 버튼 구조 유지
+        setNavBtnText(elEditModeBtn, `편집: ${editEnabled ? "ON" : "OFF"}`);
+
         elEditModeBtn.classList.toggle("primary", editEnabled);
         elAdd.disabled = !editEnabled;
 
@@ -194,11 +219,11 @@
 
         const nickI = header.findIndex(h => h === "닉네임" || h === "nickname");
         const roleI = header.findIndex(h => h === "직위" || h === "직책" || h === "role");
-        const powI = header.findIndex(h => h === "전투력(억)" || h === "전투력" || h === "power");
+        const powI = header.findIndex(h => h === "전투력" || h === "전투력" || h === "power");
         const noteI = header.findIndex(h => h === "비고" || h === "note");
 
         if (nickI < 0 || roleI < 0 || powI < 0 || noteI < 0) {
-            throw new Error("CSV 헤더가 올바르지 않습니다. (닉네임, 직위, 전투력(억), 비고)");
+            throw new Error("CSV 헤더가 올바르지 않습니다. (닉네임, 직위, 전투력, 비고)");
         }
 
         const out = [];
@@ -212,7 +237,7 @@
                 tier: Number(tier),
                 nick,
                 role: String(line[roleI] ?? "").trim(),
-                power: toNumberSafe(line[powI]),
+                power: toNumberSafe(line[powI]), // 입력은 "억" 기준 숫자
                 note: String(line[noteI] ?? "").trim(),
             });
         }
@@ -239,8 +264,9 @@
         setLoading(true);
         try {
             if (currentTier === "ALL") {
-                const [a, b, c] = await Promise.all([loadTier(1), loadTier(2), loadTier(3), loadTier(4), loadTier(5)]);
-                allRows = [...a, ...b, ...c];
+                // ✅ 공인 1~5까지 전부 합산
+                const list = await Promise.all([1, 2, 3, 4, 5].map(loadTier));
+                allRows = list.flat();
             } else {
                 allRows = await loadTier(currentTier);
             }
@@ -324,6 +350,8 @@
     // ===== Note expand toggle (table + cards)
     function bindNoteToggle(rootEl) {
         rootEl.querySelectorAll(".note, .mnote").forEach(el => {
+            if (el.dataset.bound === "1") return;
+            el.dataset.bound = "1";
             el.addEventListener("click", () => el.classList.toggle("expanded"));
         });
     }
@@ -333,17 +361,18 @@
         viewRows = filtered;
 
         const count = filtered.length;
-        const powers = filtered.map(x => Number(x.power || 0));
+        const powers = filtered.map(x => Number(x.power || 0)); // "억" 기준 숫자
         const sum = powers.reduce((acc, v) => acc + v, 0);
         const avg = count ? (sum / count) : 0;
         const max = count ? Math.max(...powers) : 0;
         const min = count ? Math.min(...powers) : 0;
 
         elStatCount.textContent = `${count}명`;
-        elStatSum.textContent = `${round1(sum)}억`;
-        elStatAvg.textContent = `${round1(avg)}억`;
-        elStatMax.textContent = `${round1(max)}억`;
-        elStatMin.textContent = `${round1(min)}억`;
+        // ✅ 통계도 조/억 같이 표시
+        elStatSum.textContent = formatPowerKor(sum);
+        elStatAvg.textContent = formatPowerKor(avg);
+        elStatMax.textContent = formatPowerKor(max);
+        elStatMin.textContent = formatPowerKor(min);
 
         const top10RankMap = getTop10RankMap(filtered);
 
@@ -376,7 +405,7 @@
           <td><span class="${roleChipClass}">${escapeHtml(roleText)}</span></td>
           <td class="right">
             <span class="power-cell">
-              <span class="power-num">${formatEok(r.power)}</span>
+              <span class="power-num">${formatPowerKor(r.power)}</span>
               ${topBadge}
             </span>
           </td>
@@ -410,7 +439,7 @@
 
               <div class="mcard-meta" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
                 <span class="${roleChipClass}">${escapeHtml(roleText)}</span>
-                <span class="chip role-normal">전투력 <span style="margin-left:6px; font-weight:950;">${formatEok(r.power)}</span></span>
+                <span class="chip role-normal">전투력 <span style="margin-left:6px; font-weight:950;">${formatPowerKor(r.power)}</span></span>
                 ${rank ? `<span class="top-rank">TOP${rank}</span>` : ""}
                 <span class="chip role-normal">공인 <span style="margin-left:6px; font-weight:950;">${r.tier}</span></span>
               </div>
@@ -451,7 +480,7 @@
         elMTier.value = (currentTier === "ALL") ? "1" : String(currentTier);
         elMNick.value = "";
         elMRole.value = "";
-        elMPower.value = "";
+        elMPower.value = ""; // 입력은 여전히 "억" 기준 숫자
         elMNote.value = "";
 
         memberModal.show();
@@ -467,7 +496,7 @@
         elMTier.value = String(row.tier);
         elMNick.value = row.nick || "";
         elMRole.value = row.role || "";
-        elMPower.value = String(row.power ?? "");
+        elMPower.value = String(row.power ?? ""); // 억 기준
         elMNote.value = row.note || "";
 
         memberModal.show();
@@ -478,7 +507,7 @@
         const tier = Number(elMTier.value || 1);
         const nick = String(elMNick.value || "").trim();
         const role = String(elMRole.value || "").trim();
-        const power = toNumberSafe(elMPower.value);
+        const power = toNumberSafe(elMPower.value); // 억 기준
         const note = String(elMNote.value || "").trim();
 
         if (!nick) return { ok: false, msg: "닉네임을 입력해 주세요." };
@@ -521,7 +550,7 @@
         return s;
     }
     function makeExportCSV(rows) {
-        const header = ["닉네임", "직위", "전투력(억)", "비고"];
+        const header = ["닉네임", "직위", "전투력", "비고"]; // export 값은 억 기준 숫자로 유지
         const lines = [header.join(",")];
         rows.forEach((r) => {
             lines.push([
@@ -726,7 +755,7 @@
         syncSortDirPill();
         setEditEnabled(false);
 
-        // preload csv
+        // preload csv (실패해도 진행)
         await Promise.all([1, 2, 3, 4, 5].map(loadTier).map(p => p.catch(() => [])));
         await loadByCurrentTier();
     }
