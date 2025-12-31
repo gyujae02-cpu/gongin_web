@@ -17,6 +17,9 @@
 
     const MODE_KEY = "guild_view_mode_v1";
 
+    // ✅ CSV 캐시 강제 무효화 (새로고침할 때마다 값이 바뀌어서 항상 최신 CSV를 받음)
+    const CSV_BUST = Date.now();
+
     // ===== Elements (HTML 변경 반영)
     const elLogout = document.getElementById("logoutBtn");
     const elExport = document.getElementById("exportBtn");
@@ -219,7 +222,8 @@
 
         const nickI = header.findIndex(h => h === "닉네임" || h === "nickname");
         const roleI = header.findIndex(h => h === "직위" || h === "직책" || h === "role");
-        const powI = header.findIndex(h => h === "전투력" || h === "전투력" || h === "power");
+        // ✅ "전투력(억)" / "전투력" 둘 다 인식
+        const powI = header.findIndex(h => h === "전투력(억)" || h === "전투력" || h === "power");
         const noteI = header.findIndex(h => h === "비고" || h === "note");
 
         if (nickI < 0 || roleI < 0 || powI < 0 || noteI < 0) {
@@ -249,7 +253,11 @@
         if (cache.has(t)) return cache.get(t);
 
         const file = CSV_FILES[t];
-        const res = await fetch(encodeURI(file), { cache: "no-store" });
+
+        // ✅ 캐시 버스트 적용: URL이 매번 달라져서 브라우저/Pages 캐시를 우회
+        const url = `${encodeURI(file)}?v=${CSV_BUST}`;
+        const res = await fetch(url, { cache: "no-store" });
+
         if (!res.ok) throw new Error(`CSV를 불러오지 못했습니다: ${file} (HTTP ${res.status})`);
 
         const text = await res.text();
@@ -480,7 +488,7 @@
         elMTier.value = (currentTier === "ALL") ? "1" : String(currentTier);
         elMNick.value = "";
         elMRole.value = "";
-        elMPower.value = ""; // 입력은 여전히 "억" 기준 숫자
+        elMPower.value = ""; // 입력은 "억" 기준 숫자
         elMNote.value = "";
 
         memberModal.show();
