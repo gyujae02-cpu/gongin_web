@@ -239,7 +239,7 @@
         setLoading(true);
         try {
             if (currentTier === "ALL") {
-                const [a, b, c] = await Promise.all([loadTier(1), loadTier(2), loadTier(3)]);
+                const [a, b, c] = await Promise.all([loadTier(1), loadTier(2), loadTier(3), loadTier(4), loadTier(5)]);
                 allRows = [...a, ...b, ...c];
             } else {
                 allRows = await loadTier(currentTier);
@@ -727,7 +727,7 @@
         setEditEnabled(false);
 
         // preload csv
-        await Promise.all([1, 2, 3].map(loadTier).map(p => p.catch(() => [])));
+        await Promise.all([1, 2, 3, 4, 5].map(loadTier).map(p => p.catch(() => [])));
         await loadByCurrentTier();
     }
 
