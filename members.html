@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Guild Members</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -25,6 +25,26 @@
       --gold: rgba(245, 158, 11, .95);
       --gold-bg: rgba(245, 158, 11, .14);
       --gold-stroke: rgba(245, 158, 11, .28);
+
+      --green: rgba(34, 197, 94, .95);
+      --green-bg: rgba(34, 197, 94, .12);
+      --green-stroke: rgba(34, 197, 94, .26);
+
+      --violet: rgba(99, 102, 241, .95);
+      --violet-bg: rgba(99, 102, 241, .12);
+      --violet-stroke: rgba(99, 102, 241, .26);
+
+      --slate-bg: rgba(148, 163, 184, .18);
+      --slate-stroke: rgba(148, 163, 184, .35);
+      --slate: rgba(100, 116, 139, .92);
+
+      --page-h: 100dvh;
+      --vvh: 1vh;
+    }
+
+    html,
+    body {
+      height: 100%;
     }
 
     body {
@@ -32,12 +52,18 @@
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
       font-weight: 400;
+      overflow-x: hidden;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
+    /* safe-area + dvh */
     .wrap {
       max-width: 1120px;
       margin: 0 auto;
-      padding: 22px 14px 34px;
+      padding:
+        calc(18px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(26px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
+      min-height: calc(var(--vvh) * 100);
     }
 
     .cardx {
@@ -62,6 +88,10 @@
       color: var(--badge-text);
       border: 1px solid rgba(47, 125, 225, .20);
       font-size: 13px;
+      white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .dot {
@@ -70,35 +100,60 @@
       border-radius: 99px;
       background: var(--blue);
       box-shadow: 0 0 0 4px rgba(47, 125, 225, .18);
+      flex: 0 0 auto;
     }
 
     .title {
       margin-top: 10px;
-      font-size: 20px;
+      font-size: clamp(18px, 2.2vw, 20px);
       letter-spacing: -0.02em;
+      line-height: 1.2;
+      word-break: keep-all;
     }
 
-    .btn-ghost {
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn-ghost,
+    .btn-export,
+    .btn-toggle {
       height: 42px;
       border-radius: 14px;
-      border: 1px solid var(--stroke);
-      background: rgba(255, 255, 255, .9);
       padding: 0 12px;
       font-weight: 400;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, .92);
     }
 
     .btn-export {
-      height: 42px;
-      border-radius: 14px;
       border: 1px solid rgba(47, 125, 225, .24);
       background: rgba(237, 244, 255, .85);
       color: rgba(47, 125, 225, .95);
-      padding: 0 12px;
-      font-weight: 400;
     }
 
     .btn-export:hover {
       background: rgba(237, 244, 255, .95);
+    }
+
+    .btn-toggle.active {
+      border-color: rgba(47, 125, 225, .26);
+      background: rgba(237, 244, 255, .75);
+      color: rgba(47, 125, 225, .95);
     }
 
     .controls {
@@ -120,6 +175,7 @@
       background: rgba(255, 255, 255, .9);
       color: rgba(15, 23, 42, .72);
       font-weight: 400;
+      white-space: nowrap;
     }
 
     .seg button.active {
@@ -135,6 +191,8 @@
       padding: 10px 12px;
       background: rgba(249, 251, 255, .95);
       font-weight: 400;
+      font-size: 16px;
+      /* iOS 확대 방지 */
     }
 
     .control:focus {
@@ -144,27 +202,78 @@
       background: #fff;
     }
 
-    /* 통계 */
-    .stats-row {
-      display: flex;
-      gap: 12px;
+    /* 카드모드 정렬 컨트롤 */
+    .sortbar {
+      margin-top: 10px;
+      display: none;
+      gap: 10px;
+      flex-wrap: wrap;
       align-items: center;
+    }
+
+    .sortbar .sortpill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, .12);
+      background: rgba(255, 255, 255, .9);
+      color: rgba(15, 23, 42, .72);
+      font-size: 13px;
+      user-select: none;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .sortbar .sortpill.active {
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      border-color: rgba(47, 125, 225, .28);
+    }
+
+    .sortbar select {
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, .12);
+      background: rgba(255, 255, 255, .92);
+      padding: 0 12px;
+      font-size: 13px;
+      color: rgba(15, 23, 42, .72);
+      appearance: none;
+    }
+
+    .sortbar .hint {
+      font-size: 12.5px;
+      color: rgba(15, 23, 42, .55);
+    }
+
+    /* 통계: grid로 재배치 */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items: stretch;
       padding: 12px 16px;
       border-top: 1px solid rgba(15, 23, 42, .08);
       background: linear-gradient(180deg, #f7f9ff, #ffffff);
-      flex-wrap: wrap;
     }
 
     .stat {
       display: flex;
       gap: 6px;
       align-items: baseline;
-      padding: 6px 12px;
+      justify-content: center;
+      padding: 8px 10px;
       border-radius: 999px;
       border: 1px solid rgba(15, 23, 42, .10);
       background: rgba(255, 255, 255, .85);
       font-size: 13px;
       color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .stat .value {
@@ -199,6 +308,10 @@
       background: rgba(249, 251, 255, .90);
       font-size: 13px;
       color: rgba(15, 23, 42, .65);
+      white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .gi .v {
@@ -206,10 +319,11 @@
       color: rgba(15, 23, 42, .90);
     }
 
-    /* 테이블 */
+    /* ===== 테이블 ===== */
     .table-wrap {
       width: 100%;
       overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     table {
@@ -334,37 +448,160 @@
       background: rgba(100, 116, 139, .90);
     }
 
-    tr.top5 {
-      background: linear-gradient(90deg, rgba(245, 158, 11, .10), rgba(255, 255, 255, 0));
+    /* ===== 뱃지들 ===== */
+    .badgepack {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-right: 8px;
     }
 
-    tr.top5 td {
-      border-color: rgba(245, 158, 11, .18) !important;
-    }
-
-    .top5-badge {
+    .rank-badge {
       display: inline-flex;
       align-items: center;
       gap: 6px;
       padding: 6px 10px;
       border-radius: 999px;
-      border: 1px solid var(--gold-stroke);
-      background: var(--gold-bg);
-      color: rgba(120, 53, 15, .95);
       font-size: 12px;
       line-height: 1;
-      margin-right: 8px;
       white-space: nowrap;
+      border: 1px solid rgba(15, 23, 42, .12);
+      background: rgba(15, 23, 42, .04);
+      color: rgba(15, 23, 42, .72);
     }
 
-    .top5-badge .c {
+    .rank-badge .c {
       width: 7px;
       height: 7px;
       border-radius: 99px;
+      background: rgba(15, 23, 42, .35);
+      box-shadow: 0 0 0 4px rgba(15, 23, 42, .10);
+    }
+
+    .rank-top10 {
+      border-color: var(--gold-stroke);
+      background: var(--gold-bg);
+      color: rgba(120, 53, 15, .95);
+    }
+
+    .rank-top10 .c {
       background: var(--gold);
       box-shadow: 0 0 0 4px rgba(245, 158, 11, .18);
     }
 
+    .power-50 {
+      border-color: var(--green-stroke);
+      background: var(--green-bg);
+      color: rgba(22, 101, 52, .95);
+    }
+
+    .power-50 .c {
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, .16);
+    }
+
+    .power-100 {
+      border-color: var(--violet-stroke);
+      background: var(--violet-bg);
+      color: rgba(55, 48, 163, .95);
+    }
+
+    .power-100 .c {
+      background: var(--violet);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, .16);
+    }
+
+    /* ===== TOP10 하이라이트 ===== */
+    tr.top10 {
+      background: linear-gradient(90deg, rgba(245, 158, 11, .10), rgba(255, 255, 255, 0));
+    }
+
+    tr.top10 td {
+      border-color: rgba(245, 158, 11, .18) !important;
+    }
+
+    /* ===== 카드 리스트 모드 ===== */
+    .list-wrap {
+      display: none;
+      padding: 12px;
+    }
+
+    .mcard {
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: rgba(255, 255, 255, .96);
+      border-radius: 18px;
+      box-shadow: 0 10px 22px rgba(15, 23, 42, .06);
+      padding: 12px 12px;
+    }
+
+    .mcard+.mcard {
+      margin-top: 10px;
+    }
+
+    .mcard-top {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .mcard-name {
+      font-size: 16px;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      word-break: keep-all;
+    }
+
+    .mcard-meta {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .mkv {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, .10);
+      background: rgba(249, 251, 255, .90);
+      font-size: 12.5px;
+      color: rgba(15, 23, 42, .65);
+      white-space: nowrap;
+    }
+
+    .mkv .v {
+      color: rgba(15, 23, 42, .92);
+      font-weight: 600;
+    }
+
+    .mnote {
+      margin-top: 10px;
+      padding: 10px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(15, 23, 42, .08);
+      background: rgba(15, 23, 42, .02);
+      color: rgba(15, 23, 42, .75);
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: normal;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .mnote.expanded {
+      -webkit-line-clamp: unset;
+    }
+
+    /* 상태 박스 */
     .error {
       display: none;
       margin: 10px 16px;
@@ -385,6 +622,193 @@
       background: rgba(15, 23, 42, .03);
       color: rgba(15, 23, 42, .70);
       font-size: 13px;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 991px) {
+      .stats-row {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .note-col {
+        min-width: 320px;
+      }
+    }
+
+    @media (max-width: 575px) {
+      .wrap {
+        padding:
+          calc(16px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
+      }
+
+      .topbar {
+        padding: 14px;
+      }
+
+      .controls {
+        padding: 12px 14px 14px;
+      }
+
+      .actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .btn-ghost,
+      .btn-export,
+      .btn-toggle {
+        flex: 1 1 auto;
+      }
+
+      .seg button {
+        height: 34px;
+        padding: 0 12px;
+        font-size: 13px;
+      }
+
+      .control {
+        height: 44px;
+        border-radius: 14px;
+      }
+
+      .sortbar {
+        display: flex;
+      }
+
+      .stats-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 12px 14px;
+      }
+
+      .stat {
+        justify-content: flex-start;
+      }
+
+      .stat .value {
+        font-size: 17px;
+      }
+
+      table {
+        min-width: 860px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .pill {
+        font-size: 12px;
+        padding: 6px 12px;
+      }
+
+      .title {
+        font-size: 18px;
+      }
+
+      .btn-ghost,
+      .btn-export,
+      .btn-toggle {
+        height: 40px;
+        border-radius: 12px;
+      }
+
+      .seg {
+        gap: 6px;
+      }
+
+      .seg button {
+        height: 32px;
+        padding: 0 10px;
+        font-size: 12.5px;
+      }
+
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+
+      .stat {
+        justify-content: space-between;
+      }
+
+      .stat .value {
+        font-size: 16px;
+      }
+
+      .gi {
+        font-size: 12.5px;
+      }
+
+      .list-wrap {
+        padding: 10px;
+      }
+
+      .mcard {
+        padding: 11px;
+      }
+
+      .mcard-name {
+        font-size: 15.5px;
+      }
+    }
+
+    @media (max-width: 320px) {
+      .wrap {
+        padding:
+          calc(14px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
+      }
+
+      .topbar {
+        padding: 12px;
+      }
+
+      .controls {
+        padding: 10px 12px 12px;
+      }
+
+      .stats-row {
+        padding: 10px 12px;
+      }
+
+      .pill {
+        font-size: 11.5px;
+      }
+
+      .title {
+        font-size: 17px;
+      }
+
+      .control {
+        height: 44px;
+        padding: 10px 10px;
+      }
+
+      .error,
+      .loading {
+        margin: 10px 12px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+
+    /* 모드 토글 상태 */
+    .mode-table .table-wrap {
+      display: block;
+    }
+
+    .mode-table .list-wrap {
+      display: none;
+    }
+
+    .mode-cards .table-wrap {
+      display: none;
+    }
+
+    .mode-cards .list-wrap {
+      display: block;
     }
   </style>
 </head>
@@ -411,15 +835,16 @@
 
     <div class="cardx mb-3">
       <div class="topbar">
-        <div class="d-flex justify-content-between gap-2">
-          <div>
+        <div class="top-row">
+          <div class="min-w-0">
             <div class="pill"><span class="dot"></span> 메이플키우기 16서버 · 공인 길드</div>
             <div class="title">길드원 관리</div>
           </div>
 
-          <div class="d-flex gap-2 align-items-start">
-            <button id="exportBtn" class="btn-export">내보내기</button>
-            <button id="logoutBtn" class="btn-ghost">로그아웃</button>
+          <div class="actions">
+            <button id="modeBtn" class="btn-toggle" type="button">모드: 테이블</button>
+            <button id="exportBtn" class="btn-export" type="button">내보내기</button>
+            <button id="logoutBtn" class="btn-ghost" type="button">로그아웃</button>
           </div>
         </div>
 
@@ -441,6 +866,18 @@
             <input id="q" class="control w-100" placeholder="닉네임 / 직위 / 비고 검색" />
           </div>
         </div>
+
+        <!-- 모바일에서 카드 모드 정렬 조작 -->
+        <div id="sortbar" class="sortbar">
+          <div class="sortpill" id="sortDirPill" role="button" tabindex="0">정렬: 내림차순</div>
+          <select id="sortKeySel" aria-label="정렬 기준">
+            <option value="power">전투력</option>
+            <option value="nick">닉네임</option>
+            <option value="role">직위</option>
+            <option value="note">비고</option>
+          </select>
+          <div class="hint">헤더 클릭 정렬도 그대로 지원</div>
+        </div>
       </div>
 
       <div class="stats-row">
@@ -460,7 +897,8 @@
       </div>
     </div>
 
-    <div class="cardx">
+    <div class="cardx mode-table" id="viewRoot">
+      <!-- TABLE -->
       <div class="table-wrap">
         <table class="table table-hover align-middle">
           <thead id="thead">
@@ -475,12 +913,42 @@
           <tbody id="tbody"></tbody>
         </table>
       </div>
+
+      <!-- CARDS -->
+      <div class="list-wrap" id="listWrap">
+        <div id="cards"></div>
+      </div>
     </div>
 
   </div>
 
   <script>
+    /* ===============================
+       VisualViewport 기반 dvh 안정화 (iOS 키보드 대응)
+       =============================== */
+    (function setupVVH() {
+      const root = document.documentElement;
+
+      function applyVVH() {
+        const vv = window.visualViewport;
+        const h = vv ? vv.height : window.innerHeight;
+        root.style.setProperty('--vvh', `${h / 100}px`);
+      }
+
+      applyVVH();
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', applyVVH);
+        window.visualViewport.addEventListener('scroll', applyVVH);
+      } else {
+        window.addEventListener('resize', applyVVH);
+      }
+    })();
+  </script>
+
+  <script>
     const AUTH_KEY = "guild_auth_v1";
+
     const CSV_FILES = {
       1: "공인1_길드원_리스트.csv",
       2: "공인2_길드원_리스트.csv",
@@ -493,6 +961,54 @@
       3: { hq: "Lv.4", wh: "Lv.4", lab: "Lv.4" },
     };
 
+    /* ====== 카드/테이블 모드 ====== */
+    const MODE_KEY = "guild_view_mode_v1"; // "table" | "cards"
+    const elViewRoot = document.getElementById("viewRoot");
+    const elModeBtn = document.getElementById("modeBtn");
+    const elSortbar = document.getElementById("sortbar");
+    const elSortKeySel = document.getElementById("sortKeySel");
+    const elSortDirPill = document.getElementById("sortDirPill");
+
+    function isMobileLike() { return window.matchMedia("(max-width: 575px)").matches; }
+
+    function applyMode(mode) {
+      const m = (mode === "cards") ? "cards" : "table";
+      localStorage.setItem(MODE_KEY, m);
+
+      elViewRoot.classList.toggle("mode-table", m === "table");
+      elViewRoot.classList.toggle("mode-cards", m === "cards");
+
+      elModeBtn.textContent = (m === "cards") ? "모드: 카드" : "모드: 테이블";
+      elModeBtn.classList.toggle("active", m === "cards");
+
+      // 모바일일 때만 카드 정렬바 노출 (카드모드에서 의미가 큼)
+      if (m === "cards" && isMobileLike()) elSortbar.style.display = "flex";
+      else elSortbar.style.display = isMobileLike() ? "flex" : "none";
+    }
+
+    function getModePref() {
+      const saved = localStorage.getItem(MODE_KEY);
+      if (saved === "cards" || saved === "table") return saved;
+      // 기본: 모바일은 카드, 그 외는 테이블
+      return isMobileLike() ? "cards" : "table";
+    }
+
+    function toggleMode() {
+      const now = localStorage.getItem(MODE_KEY) || getModePref();
+      applyMode(now === "cards" ? "table" : "cards");
+      render();
+    }
+
+    elModeBtn.addEventListener("click", toggleMode);
+
+    window.addEventListener("resize", () => {
+      // 모바일/데스크탑 전환 시 모드 자동 강제는 하지 않고,
+      // sortbar 노출만 자연스럽게 조정
+      const m = localStorage.getItem(MODE_KEY) || getModePref();
+      applyMode(m);
+    });
+
+    /* ====== 기본 엘리먼트 ====== */
     const elLogout = document.getElementById("logoutBtn");
     const elExport = document.getElementById("exportBtn");
     const elSeg = document.getElementById("seg");
@@ -501,6 +1017,7 @@
     const elTbody = document.getElementById("tbody");
     const elError = document.getElementById("errorBox");
     const elLoading = document.getElementById("loadingBox");
+    const elCards = document.getElementById("cards");
 
     const elStatCount = document.getElementById("statCount");
     const elStatSum = document.getElementById("statSum");
@@ -549,6 +1066,9 @@
       location.replace("index.html");
     });
 
+    /* ===============================
+       CSV 파싱
+       =============================== */
     function parseCSV(text) {
       const rows = [];
       let i = 0, field = "", row = [], inQuotes = false;
@@ -656,6 +1176,9 @@
       }
     }
 
+    /* ===============================
+       렌더 유틸
+       =============================== */
     function escapeHtml(s) {
       return String(s ?? "")
         .replaceAll("&", "&amp;")
@@ -695,7 +1218,6 @@
       if (sortKey === "role") {
         const ar = roleSortRank(a.role);
         const br = roleSortRank(b.role);
-
         if (ar !== br) return (ar - br) * dir;
 
         const av = String(a.role ?? "");
@@ -707,6 +1229,7 @@
       }
 
       if (sortKey === "power") return ((a.power || 0) - (b.power || 0)) * dir;
+
       const av = String(a[sortKey] ?? "");
       const bv = String(b[sortKey] ?? "");
       return av.localeCompare(bv, "ko") * dir;
@@ -723,21 +1246,52 @@
       if (!r) return "";
 
       if (r.includes("길드장") || r.includes("마스터") || r.includes("master") || r.includes("leader")) return "role-leader";
-
       if (r.includes("부") || r.includes("운영") || r.includes("간부") || r.includes("임원") || r.includes("officer") || r.includes("admin")) return "role-officer";
-
       if (r.includes("게스트") || r.includes("대기") || r.includes("신규") || r.includes("guest") || r.includes("new")) return "role-guest";
-
       return "role-member";
     }
 
-    function getTop5NickSet(rows) {
+    /* ===============================
+       TOP10 + 전투력 구간 뱃지
+       - TOP10: 현재 필터/검색/정렬 적용 전(필터 적용 후) power 기준 상위 10명 표시
+       - 전투력 구간: 100억+, 50억+ (100 우선)
+       =============================== */
+    function getTop10NickSet(rows) {
       const top = rows
         .slice()
-        .sort((a, b) => (Number(b.power || 0) - Number(a.power || 0)))
-        .slice(0, 5)
+        .sort((a, b) => Number(b.power || 0) - Number(a.power || 0))
+        .slice(0, 10)
         .map(x => x.nick);
       return new Set(top);
+    }
+
+    function getPowerBadgeClass(power) {
+      const p = Number(power || 0);
+      if (p >= 100) return "power-100";
+      if (p >= 50) return "power-50";
+      return "";
+    }
+
+    function getPowerBadgeLabel(power) {
+      const p = Number(power || 0);
+      if (p >= 100) return "100억+";
+      if (p >= 50) return "50억+";
+      return "";
+    }
+
+    function makeBadgePackHTML(isTop10, power) {
+      const pClass = getPowerBadgeClass(power);
+      const pLabel = getPowerBadgeLabel(power);
+
+      const parts = [];
+      if (isTop10) {
+        parts.push(`<span class="rank-badge rank-top10"><span class="c"></span>TOP10</span>`);
+      }
+      if (pClass && pLabel) {
+        parts.push(`<span class="rank-badge ${pClass}"><span class="c"></span>${pLabel}</span>`);
+      }
+      if (parts.length === 0) return "";
+      return `<span class="badgepack">${parts.join("")}</span>`;
     }
 
     function render() {
@@ -757,35 +1311,75 @@
       elStatMax.textContent = `${round1(max)}억`;
       elStatMin.textContent = `${round1(min)}억`;
 
-      const top5Set = getTop5NickSet(filtered);
+      const top10Set = getTop10NickSet(filtered);
 
+      // TABLE
       elTbody.innerHTML = filtered.map((r, i) => {
-        const isTop5 = top5Set.has(r.nick);
+        const isTop10 = top10Set.has(r.nick);
         const rc = roleClass(r.role);
-
-        const topBadge = isTop5
-          ? `<span class="top5-badge"><span class="c"></span>TOP5</span>`
-          : ``;
+        const badges = makeBadgePackHTML(isTop10, r.power);
 
         return `
-        <tr class="${isTop5 ? "top5" : ""}">
-          <td class="muted">${i + 1}</td>
-          <td>${topBadge}${escapeHtml(r.nick)}</td>
-          <td>
-            <span class="role-pill ${rc}">
-              ${escapeHtml(r.role || "-")}
-            </span>
-          </td>
-          <td class="right">${formatEok(r.power)}</td>
-          <td class="note-col" title="${escapeHtml(r.note)}">${escapeHtml(r.note)}</td>
-        </tr>
-      `;
+          <tr class="${isTop10 ? "top10" : ""}">
+            <td class="muted">${i + 1}</td>
+            <td>${badges}${escapeHtml(r.nick)}</td>
+            <td>
+              <span class="role-pill ${rc}">
+                ${escapeHtml(r.role || "-")}
+              </span>
+            </td>
+            <td class="right">${formatEok(r.power)}</td>
+            <td class="note-col" title="${escapeHtml(r.note)}">${escapeHtml(r.note)}</td>
+          </tr>
+        `;
       }).join("");
 
       updateSortIndicators();
       updateGuildInfo();
+
+      // CARDS
+      elCards.innerHTML = filtered.map((r, i) => {
+        const isTop10 = top10Set.has(r.nick);
+        const rc = roleClass(r.role);
+        const badges = makeBadgePackHTML(isTop10, r.power);
+
+        const roleHtml = `
+          <span class="role-pill ${rc}">
+            ${escapeHtml(r.role || "-")}
+          </span>
+        `;
+
+        return `
+          <div class="mcard">
+            <div class="mcard-top">
+              <div style="min-width:0;">
+                <div class="mcard-name">
+                  <span class="muted" style="margin-right:6px;">${i + 1}.</span>
+                  ${badges}${escapeHtml(r.nick)}
+                </div>
+                <div class="mcard-meta">
+                  ${roleHtml}
+                  <span class="mkv">전투력 <span class="v">${formatEok(r.power)}</span></span>
+                  <span class="mkv">공인 <span class="v">${r.tier}</span></span>
+                </div>
+              </div>
+              <div class="muted" style="font-size:12.5px; white-space:nowrap;">${isTop10 ? "TOP10" : ""}</div>
+            </div>
+
+            <div class="mnote" title="터치하면 펼쳐짐">${escapeHtml(r.note || "-")}</div>
+          </div>
+        `;
+      }).join("");
+
+      // 카드 노트 펼치기
+      elCards.querySelectorAll(".mnote").forEach(el => {
+        el.addEventListener("click", () => el.classList.toggle("expanded"));
+      });
     }
 
+    /* ===============================
+       Export
+       =============================== */
     function getTierLabel() { return currentTier === "ALL" ? "ALL" : `공인${currentTier}`; }
     function csvEscape(v) {
       const s = String(v ?? "");
@@ -823,6 +1417,9 @@
       downloadTextFile(`${fileBase}.csv`, makeExportCSV(viewRows));
     });
 
+    /* ===============================
+       Tier / Search / Sort
+       =============================== */
     elSeg.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-tier]");
       if (!btn) return;
@@ -852,8 +1449,83 @@
         sortKey = key;
         sortDir = (key === "power") ? "desc" : "asc";
       }
+
+      // 카드 정렬 UI 반영
+      elSortKeySel.value = sortKey;
+      syncSortDirPill();
+
       render();
     });
+
+    function syncSortDirPill() {
+      elSortDirPill.textContent = `정렬: ${sortDir === "asc" ? "오름차순" : "내림차순"}`;
+      elSortDirPill.classList.toggle("active", sortDir === "desc");
+    }
+
+    elSortKeySel.addEventListener("change", () => {
+      sortKey = elSortKeySel.value || "power";
+      if (sortKey === "power" && (sortDir !== "asc" && sortDir !== "desc")) sortDir = "desc";
+      if (sortKey !== "power" && (sortDir !== "asc" && sortDir !== "desc")) sortDir = "asc";
+      render();
+    });
+
+    elSortDirPill.addEventListener("click", () => {
+      sortDir = (sortDir === "asc") ? "desc" : "asc";
+      syncSortDirPill();
+      render();
+    });
+
+    elSortDirPill.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        elSortDirPill.click();
+      }
+    });
+
+    /* ===============================
+       iOS Safari 키보드 "스크롤 튐" 최소화
+       - focus 시 살짝 지연 후 중앙 정렬로 스크롤
+       - visualViewport resize에 맞춰 dvh 보정
+       - preventScroll 지원 시 사용
+       =============================== */
+    (function setupIOSFocusStabilizer() {
+      const prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      function smartFocusScroll(el) {
+        if (!el) return;
+        // iOS에서 즉시 scrollIntoView 하면 튐이 생길 수 있어 약간 지연
+        setTimeout(() => {
+          try {
+            el.scrollIntoView({ block: "center", inline: "nearest", behavior: prefersReduce ? "auto" : "auto" });
+          } catch (e) {
+            // fallback
+            try { el.scrollIntoView(true); } catch (_) { }
+          }
+        }, 60);
+      }
+
+      // iOS에서 focus 시 레이아웃이 바뀌는 타이밍(키보드)과 겹치면 튐
+      // input focus 시 화면 중앙으로 맞춰서 튐을 체감 최소화
+      elQ.addEventListener("focus", () => smartFocusScroll(elQ));
+      elQ.addEventListener("click", () => smartFocusScroll(elQ));
+
+      // preventScroll 옵션이 있는 브라우저는 더 안정적
+      const _focus = HTMLInputElement.prototype.focus;
+      HTMLInputElement.prototype.focus = function (opts) {
+        try {
+          return _focus.call(this, { preventScroll: true, ...opts });
+        } catch (e) {
+          return _focus.call(this, opts);
+        }
+      };
+    })();
+
+    /* ===============================
+       초기화
+       =============================== */
+    applyMode(getModePref());
+    elSortKeySel.value = sortKey;
+    syncSortDirPill();
 
     updateGuildInfo();
     loadByCurrentTier();
@@ -867,7 +1539,7 @@
          키보드 단축키 차단
          =============================== */
       document.addEventListener('keydown', function (e) {
-        const key = e.key.toLowerCase();
+        const key = (e.key || "").toLowerCase();
 
         // F12
         if (e.key === 'F12') {
