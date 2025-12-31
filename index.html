@@ -303,6 +303,44 @@
       }
     });
   </script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* ===============================
+         키보드 단축키 차단
+         =============================== */
+      document.addEventListener('keydown', function (e) {
+        const key = e.key.toLowerCase();
+
+        // F12
+        if (e.key === 'F12') {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+
+        // Ctrl 계열
+        if (e.ctrlKey) {
+          // Ctrl + S, U, P, A, C
+          if (['s', 'u', 'p', 'a', 'c'].includes(key)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+
+          // Ctrl + Shift + I, J, C
+          if (e.shiftKey && ['i', 'j', 'c'].includes(key)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+      }, true);
+    })();
+  </script>
+
 </body>
 
 </html>
