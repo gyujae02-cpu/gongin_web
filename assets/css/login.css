@@ -430,11 +430,3 @@ button {
     /* 배경이 밝거나 복잡해도 가독성 유지 */
     text-shadow: 0 1px 2px rgba(255, 255, 255, .55);
 }
-
-@media (max-width: 360px) {
-    .nexon-copyright {
-        font-size: 11px;
-        right: calc(10px + env(safe-area-inset-right));
-        bottom: calc(10px + env(safe-area-inset-bottom));
-    }
-}

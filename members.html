@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Guild Members</title>
+  <title>공인 길드 관리 시스템 - 길드원 관리</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" as="style" crossorigin
@@ -13,20 +13,15 @@
 </head>
 
 <body>
-  <div class="nexon-copyright">
-    Background image © NEXON Korea Corporation. All Rights Reserved.
-  </div>
-
   <div class="wrap">
-    <!-- Auth Guard -->
+    <!-- ✅ Auth Guard (로그인 여부만 검사 / admin 고정 검사 제거) -->
     <script>
       (function () {
         const AUTH_KEY = "guild_auth_v1";
-        const FIXED_ID = "admin";
         try {
           const raw = localStorage.getItem(AUTH_KEY);
           const a = raw ? JSON.parse(raw) : null;
-          if (!a || a.id !== FIXED_ID || !a.exp || Date.now() > a.exp) {
+          if (!a || !a.exp || Date.now() > a.exp) {
             localStorage.removeItem(AUTH_KEY);
             location.replace("index.html");
           }
@@ -36,6 +31,29 @@
         }
       })();
     </script>
+
+    <!-- ===== Top Navbar (one-line) ===== -->
+    <header class="topnav" role="banner" aria-label="Top Navigation">
+      <div class="topnav-inner">
+        <div class="topnav-left">
+          <span class="brand-title">공인 길드 관리 시스템</span>
+
+          <!-- ✅ ADD: version + patchnote button -->
+          <div class="brand-tools" aria-label="Version and Patch Notes">
+            <span id="appVer" class="chip-mini p-100 brand-ver">v1.1</span>
+            <button id="patchBtn" type="button" class="topnav-chipbtn" data-bs-toggle="modal"
+              data-bs-target="#patchModal">
+              패치노트
+            </button>
+          </div>
+        </div>
+
+        <nav class="topnav-links" aria-label="Primary">
+          <a class="topnav-link active" href="members.html">길드원 관리</a>
+          <a class="topnav-link" href="notice.html">길드 공지</a>
+        </nav>
+      </div>
+    </header>
 
     <div class="layout">
       <!-- ===== Nav (Desktop: left, Mobile/Tablet: collapsible) ===== -->
@@ -53,8 +71,6 @@
           </summary>
 
           <div class="navx-card">
-            <!-- <div class="navx-sub">도구</div> -->
-
             <div class="navx-group">
               <div class="navx-label">보기</div>
               <button id="modeBtn" class="navx-btn" type="button">
@@ -65,18 +81,10 @@
 
             <div class="navx-group">
               <div class="navx-label">관리</div>
-              <button id="editModeBtn" class="navx-btn" type="button">
-                <span class="navx-ico">✎</span>
-                <span class="navx-txt">편집: OFF</span>
-              </button>
               <button id="addBtn" class="navx-btn" type="button" disabled>
                 <span class="navx-ico">＋</span>
                 <span class="navx-txt">길드원 추가</span>
               </button>
-              <!-- <button id="exportBtn" class="navx-btn" type="button">
-                <span class="navx-ico">⇩</span>
-                <span class="navx-txt">CSV 내보내기</span>
-              </button> -->
             </div>
 
             <div class="navx-divider"></div>
@@ -86,9 +94,9 @@
               <span class="navx-txt">로그아웃</span>
             </button>
 
-            <div class="navx-foot">
+            <!-- <div class="navx-foot">
               <span class="chip-mini p-100">v1.0</span>
-            </div>
+            </div> -->
           </div>
         </details>
       </aside>
@@ -100,7 +108,9 @@
             <div class="top-row">
               <div class="min-w-0">
                 <div class="title">공인 길드원 관리</div>
-                <div class="desc">기본은 읽기 전용입니다. 관리자는 ‘편집 모드’에서만 추가/수정/삭제가 가능합니다.</div>
+                <div class="desc" id="pageDesc">
+                  불러오는 중…
+                </div>
               </div>
             </div>
 
@@ -118,6 +128,7 @@
                 <button type="button" data-tier="4">공인4</button>
                 <button type="button" data-tier="5">공인5</button>
                 <button type="button" data-tier="JOIN" class="join-btn">가입 대기</button>
+                <button type="button" data-tier="BLACK" class="btn-black">블랙 리스트</button>
               </div>
 
               <div class="searchbox">
@@ -154,10 +165,9 @@
                   <th class="num-col" data-key="rowno">No <span class="sort-ind" data-si="rowno"></span></th>
                   <th class="nick-col" data-key="nick">닉네임 <span class="sort-ind" data-si="nick"></span></th>
                   <th class="role-col" data-key="role">직위 <span class="sort-ind" data-si="role"></span></th>
-                  <th class="power-col right" data-key="power">전투력 <span class="sort-ind" data-si="power"></span>
-                  </th>
+                  <th class="power-col right" data-key="power">전투력 <span class="sort-ind" data-si="power"></span></th>
                   <th class="note-col" data-key="note">비고 <span class="sort-ind" data-si="note"></span></th>
-                  <th class="act-col">작업</th>
+                  <th class="act-col" data-key="act">작업</th>
                 </tr>
               </thead>
               <tbody id="tbody"></tbody>
@@ -171,28 +181,19 @@
         </section>
       </main>
     </div>
-  </div>
 
-  <!-- Admin Password Modal -->
-  <div class="modal fade" id="adminModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content modalx">
-        <div class="modal-header">
-          <h5 class="modal-title">관리자 확인</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+    <!-- ===== Footer ===== -->
+    <footer class="footerx" role="contentinfo">
+      <div class="footerx-inner">
+        <div class="footerx-left">
+          <div>© 2025 메이플키우기 공인 길드</div>
+          <div class="footerx-nexon">Background image © NEXON Korea Corporation. All Rights Reserved.</div>
         </div>
-        <div class="modal-body">
-          <div class="mb-2 small-muted">편집 모드를 활성화하려면 관리자 비밀번호를 입력하세요.</div>
-          <input id="adminPw" class="control w-100" type="password" placeholder="Admin Password"
-            autocomplete="current-password" />
-          <div id="adminErr" class="modal-err"></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">취소</button>
-          <button id="adminOkBtn" class="btn btn-primary" type="button">확인</button>
+        <div class="footerx-right">
+          <a class="footerx-mail" href="mailto:gongin.guild@gmail.com">gonginofficial@gmail.com</a>
         </div>
       </div>
-    </div>
+    </footer>
   </div>
 
   <!-- Add/Edit Modal -->
@@ -250,41 +251,54 @@
     </div>
   </div>
 
+  <!-- ✅ ADD: Patch Notes Modal -->
+  <div class="modal fade" id="patchModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content modalx patch-modal">
+        <div class="modal-header">
+          <div class="d-flex align-items-center gap-2">
+            <h5 class="modal-title m-0">패치노트</h5>
+            <span class="chip-mini p-100" id="patchLatestVer">v1.0</span>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+        </div>
+
+        <div class="modal-body">
+          <!-- JS가 채움: patches 렌더링 -->
+          <div id="patchList" class="patch-list"></div>
+
+          <!-- JS가 채움: 5개 초과 시 페이지 버튼 표시 -->
+          <div class="patch-pager">
+            <button id="patchPrev" class="patch-pagebtn" type="button" disabled>이전</button>
+            <div id="patchPageInfo" class="patch-pageinfo">1 / 1</div>
+            <button id="patchNext" class="patch-pagebtn" type="button" disabled>다음</button>
+          </div>
+
+          <div id="patchEmpty" class="empty-box" style="display:none;">
+            표시할 패치내역이 없습니다.
+          </div>
+        </div>
+
+        <div class="modal-footer d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="./assets/js/members.js"></script>
+  <script src="./assets/js/patchnotes.js"></script>
 
   <script>
     (function () {
       'use strict';
-
-      /* ===============================
-         키보드 단축키 차단
-         =============================== */
       document.addEventListener('keydown', function (e) {
         const key = (e.key || "").toLowerCase();
-
-        // F12
-        if (e.key === 'F12') {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-
-        // Ctrl 계열
+        if (e.key === 'F12') { e.preventDefault(); e.stopPropagation(); return false; }
         if (e.ctrlKey) {
-          // Ctrl + S, U, P, A, C
-          if (['s', 'u', 'p', 'a', 'c'].includes(key)) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-          }
-
-          // Ctrl + Shift + I, J, C
-          if (e.shiftKey && ['i', 'j', 'c'].includes(key)) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-          }
+          if (['s', 'u', 'p', 'a', 'c'].includes(key)) { e.preventDefault(); e.stopPropagation(); return false; }
+          if (e.shiftKey && ['i', 'j', 'c'].includes(key)) { e.preventDefault(); e.stopPropagation(); return false; }
         }
       }, true);
     })();
